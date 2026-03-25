@@ -7,6 +7,13 @@ It is optimized for creating both 2D and 3D games with high-performance renderin
 
 The engine enforces best practices for performance while remaining customizable, allowing developers to focus on gameplay and creative iteration without compromising efficiency.
 
-## Planned
+## Planned expansions
 - Integration with the Ildz compiler, enabling transpilation from C to Ildz for a fully self-contained, high-performance development stack.
 - Visual node representation of files (.ildz, .glsl, .py, etc.) for even faster hot-reload iteration (no need for an external code editor)
+
+## License & Usage
+Copyright © 2024-2026 Christine Spades. All rights reserved.
+
+This repository is proprietary software. Unauthorized copying, modification, redistribution, hosting, or commercial use is strictly prohibited.
+
+No license is granted except by explicit written permission from the author.
