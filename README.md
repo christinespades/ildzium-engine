@@ -9,7 +9,7 @@ The engine enforces best practices for performance while remaining customizable,
 
 ## Planned expansions
 - Integration with the Ildz compiler, enabling transpilation from C to Ildz for a fully self-contained, high-performance development stack.
-- Visual node representation of files (.ildz, .glsl, .py, etc.) for even faster hot-reload iteration (no need for an external code editor)
+- In/engine visual node representation of files (.ildz, .glsl, .py, etc.) for even faster hot-reload iteration (no need for an external code editor)
 
 ## License & Usage
 Copyright © 2024-2026 Christine Spades. All rights reserved.
