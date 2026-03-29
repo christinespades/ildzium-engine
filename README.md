@@ -1,5 +1,5 @@
 # ildzium-engine
->Very rough document; the engine is not currently functional or being worked on. I have various versions of it, some in C++, C and in Ildz.
+>The engine is not functional and I'm resurrecting it. I have various versions of it, some in C++, C and in Ildz.
 
 >“Toy engine” here means a personal project, not production-ready. Open sourcing or external contributions would only occur if a functional demo were achieved, likely years in the future.
 
