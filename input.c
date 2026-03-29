@@ -1,0 +1,45 @@
+#include <GLFW/glfw3.h>
+#include "camera.h"
+#include "input.h"     // self include for consistency
+
+float lastX = 640.0f;
+float lastY = 360.0f;
+int firstMouse = 1;    // Use int instead of bool
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (firstMouse) {
+        lastX = (float)xpos;
+        lastY = (float)ypos;
+        firstMouse = 0;
+        return;
+    }
+
+    float xoffset = (float)xpos - lastX;
+    float yoffset = lastY - (float)ypos;
+    lastX = (float)xpos;
+    lastY = (float)ypos;
+
+    float sensitivity = 0.08f;
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    camera.yaw   += xoffset;
+    camera.pitch += yoffset;
+
+    if (camera.pitch > 89.0f)  camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f) camera.pitch = -89.0f;
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    camera.speed += (float)yoffset * 3.0f;
+    if (camera.speed < 1.0f)   camera.speed = 1.0f;
+    if (camera.speed > 60.0f)  camera.speed = 60.0f;
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
