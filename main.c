@@ -7,6 +7,7 @@
 #include "camera.h"
 #include "input.h"
 #include "main.h"          // <-- Important: declares the functions
+#include "ui.h"
 
 // Globals
 GLFWwindow* g_window = NULL;
@@ -18,9 +19,20 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface);
 void cleanup_renderer();
 void draw_frame();
 
+void on_button_clicked(void)
+{
+    printf("Button clicked!\n");
+}
+
+void init_ui(void) {
+    ui_init(&ui_ctx);
+    ui_add_button(&ui_ctx, 50, 50, 80, 24, "ClickMe", on_button_clicked);
+}
+
 int main()
 {
     init_glfw();
+    init_ui();
     create_vulkan_instance();
     create_surface();
 
@@ -64,12 +76,28 @@ void init_glfw(void)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    g_window = glfwCreateWindow(1280, 720, "Ildzium Engine", NULL, NULL);
+    // Get primary monitor size
+    GLFWmonitor* primary = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primary);
+    int screen_width = mode->width;
+    int screen_height = mode->height;
+
+    // Compute 75% of screen size
+    int win_width = screen_width * 3 / 4;
+    int win_height = screen_height * 3 / 4;
+
+    // Create the window
+    g_window = glfwCreateWindow(win_width, win_height, "Ildzium Engine", NULL, NULL);
     if (!g_window) {
         printf("Failed to create GLFW window\n");
         glfwTerminate();
         exit(1);
     }
+
+    // Center the window
+    int win_x = (screen_width - win_width) / 2;
+    int win_y = (screen_height - win_height) / 2;
+    glfwSetWindowPos(g_window, win_x, win_y);
 
     glfwSetKeyCallback(g_window, key_callback);
     glfwSetCursorPosCallback(g_window, mouse_callback);

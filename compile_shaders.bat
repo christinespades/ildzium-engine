@@ -14,28 +14,20 @@ if not exist %GLSLC% (
 )
 
 :: Only compile if source exists and spv is missing or older
-if exist shaders\sky.vert (
-    if not exist shaders\sky.vert.spv (
-        echo Compiling sky.vert...
-        %GLSLC% shaders\sky.vert -o shaders\sky.vert.spv
-    ) else (
-        echo sky.vert.spv already exists.
-    )
-) else (
-    echo WARNING: shaders/sky.vert not found!
-)
+set SHADERS=sky.vert sky.frag ui.vert ui.frag
 
-if exist shaders\sky.frag (
-    if not exist shaders\sky.frag.spv (
-        echo Compiling sky.frag...
-        %GLSLC% shaders\sky.frag -o shaders\sky.frag.spv
+for %%S in (%SHADERS%) do (
+    if exist shaders\%%S (
+        if not exist shaders\%%S.spv (
+            echo Compiling %%S...
+            %GLSLC% shaders\%%S -o shaders\%%S.spv
+        ) else (
+            echo %%S.spv already exists.
+        )
     ) else (
-        echo sky.frag.spv already exists.
+        echo WARNING: shaders/%%S not found!
     )
-) else (
-    echo WARNING: shaders/sky.frag not found!
 )
-
 echo Shader compilation done. Copying shaders to build directory...
 if not exist %BUILD_DIR%\shaders mkdir %BUILD_DIR%\shaders
 copy /Y shaders\*.spv %BUILD_DIR%\shaders\
