@@ -12,7 +12,7 @@ typedef struct UI_Button {
 typedef struct UI_Context {
     UI_Button* buttons;
     int button_count;
-    int cursor_visible; // 1 if cursor visible, 0 if captured
+    int cursor_captured; // 1 if cursor visible, 0 if captured
 } UI_Context;
 
 UI_Context ui_ctx;

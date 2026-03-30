@@ -105,6 +105,11 @@ optimized data structures, circular buffers, bucket arrays, hash maps, this buil
 ## Planned expansions
 - Integration with the Ildz compiler, enabling transpilation from C to Ildz for a fully self-contained, high-performance development stack.
 - In/engine visual node representation of files (.ildz, .glsl, .py, etc.) for even faster hot-reload iteration (no need for an external code editor)
+- Backend for WebGPU/WebAssembly:
+  - Browser event system (keyboard/mouse via JS)
+  - Second renderer targeting WebGPU concepts
+  - Rewrite shaders to WGSL
+  - Bridge C to browser: Emscripten for compilation and JS interop?
 
 ## License & Usage
 Copyright © 2024-2026 Christine Spades. All rights reserved.

@@ -963,7 +963,7 @@ void draw_frame()
 
     vkCmdDraw(commandBuffers[currentFrame], 4, 1, 0, 0);
 
-    if (ui_ctx.cursor_visible) {
+    if (ui_ctx.cursor_captured) {
         // Update CPU framebuffer
         ui_draw(&ui_ctx, ui_framebuffer, swapchainExtent.width, swapchainExtent.height);
         upload_ui_to_vulkan(ui_framebuffer, swapchainExtent.width, swapchainExtent.height);

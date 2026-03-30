@@ -26,7 +26,8 @@ void on_button_clicked(void)
 
 void init_ui(void) {
     ui_init(&ui_ctx);
-    ui_add_button(&ui_ctx, 50, 50, 80, 24, "ClickMe", on_button_clicked);
+    ui_add_button(&ui_ctx, 250, 250, 380, 324, "Click Me", on_button_clicked);
+    ui_add_button(&ui_ctx, 750, 750, 180, 324, "Click Me As Well", on_button_clicked);
 }
 
 int main()

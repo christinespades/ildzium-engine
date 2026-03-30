@@ -25,6 +25,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
+    if (ui_ctx.cursor_captured)
+        return;
+    
     camera.yaw   += xoffset;
     camera.pitch += yoffset;
 
@@ -41,19 +44,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    static int cursor_captured = 1; // start with cursor disabled
-
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        if (cursor_captured) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            cursor_captured = 0;
-        } else {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            cursor_captured = 1;
-        }
-        ui_ctx.cursor_visible = cursor_captured; // update UI state
+        glfwSetInputMode(window,
+            GLFW_CURSOR,
+            ui_ctx.cursor_captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        ui_ctx.cursor_captured = !ui_ctx.cursor_captured;
     }
 }

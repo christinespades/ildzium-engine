@@ -1,5 +1,6 @@
 #include "camera.h"
 #include <math.h>
+#include "ui.h"
 
 Camera camera = {0.0f, 0.0f, 5.0f, -90.0f, 0.0f, 15.0f};
 
@@ -15,6 +16,9 @@ void init_camera(void)
 
 void update_camera(float deltaTime)
 {
+    if (ui_ctx.cursor_captured)
+        return;
+
     float velocity = camera.speed * deltaTime;
 
     // Convert yaw to radians for sin/cos
