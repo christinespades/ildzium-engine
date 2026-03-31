@@ -119,16 +119,67 @@ static uint8_t font8x8_basic[128][8] = {
 
 void ui_init(UI_Context* ctx) {
     ctx->buttons = malloc(sizeof(UI_Button) * MAX_BUTTONS);
+    ctx->button_held_last_frame = calloc(MAX_BUTTONS, sizeof(uint8_t)); // zero-initialized
     ctx->button_count = 0;
-    ctx->cursor_captured = 0;
+    ctx->cursor_captured = 0;        // start with cursor disabled (camera mode)
 }
 
-void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text, void (*on_click)(void)) {
+void ui_cleanup(UI_Context* ctx) {
+    if (ctx->buttons) free(ctx->buttons);
+    if (ctx->button_held_last_frame) free(ctx->button_held_last_frame);
+    ctx->buttons = NULL;
+    ctx->button_held_last_frame = NULL;
+    ctx->button_count = 0;
+}
+
+void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text,
+                   UI_ButtonCallback on_click,
+                   UI_ButtonCallback on_held,
+                   UI_ButtonCallback on_release) {
     if (ctx->button_count >= MAX_BUTTONS) return;
-    UI_Button* b = &ctx->buttons[ctx->button_count++];
+
+    UI_Button* b = &ctx->buttons[ctx->button_count];
     b->x = x; b->y = y; b->w = w; b->h = h;
     b->text = text;
     b->on_click = on_click;
+    b->on_held = on_held;
+    b->on_release = on_release;
+
+    ctx->button_count++;
+}
+
+void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed) {
+    if (!ctx->cursor_captured) return;
+
+    for (int i = 0; i < ctx->button_count; i++) {
+        UI_Button* b = &ctx->buttons[i];
+        uint8_t* was_held = &ctx->button_held_last_frame[i];
+
+        int is_hover = (mouse_x >= b->x && mouse_x < b->x + b->w &&
+                        mouse_y >= b->y && mouse_y < b->y + b->h);
+
+        int is_pressed = mouse_pressed && is_hover;
+
+        // === Held ===
+        if (is_pressed) {
+            if (b->on_held) b->on_held();
+        }
+
+        // === Click (press + release) ===
+        if (is_pressed && !(*was_held)) {
+            // Button was just pressed this frame
+            if (b->on_click) b->on_click();
+        }
+
+        // === Release ===
+        if (!is_pressed && *was_held) {
+            // Button was released this frame
+            if (b->on_release) b->on_release();
+        }
+
+        // Update state for next frame
+        *was_held = is_pressed;
+    }
 }
 
 static void draw_pixel(uint32_t* fb, int fb_w, int fb_h, int x, int y, uint32_t color) {
@@ -213,18 +264,6 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height) {
             text_y -= scale / 2;
 
             draw_text(fb, fb_width, fb_height, b->text, text_x, text_y, 0xFFFFFFFF, scale);
-        }
-    }
-}
-
-void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed) {
-    if (!ctx->cursor_captured) return;
-    for (int i = 0; i < ctx->button_count; i++) {
-        UI_Button* b = &ctx->buttons[i];
-        if (mouse_pressed &&
-            mouse_x >= b->x && mouse_x < b->x+b->w &&
-            mouse_y >= b->y && mouse_y < b->y+b->h) {
-            if (b->on_click) b->on_click();
         }
     }
 }

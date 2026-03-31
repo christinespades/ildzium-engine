@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>     // Add this near the top
 #include "camera.h"
 #include "ui.h"
+#include "model.h"
 
 // Push constant for sky (time + camera rotation)
 typedef struct {
@@ -13,6 +14,18 @@ typedef struct {
     float pitch;    // in radians
 } SkyPushConstant;
 
+typedef struct {
+    float view[16];
+    float proj[16];
+} CameraUBO;
+
+VkBuffer cameraUBOBuffer = VK_NULL_HANDLE;
+VkDeviceMemory cameraUBOMemory = VK_NULL_HANDLE;
+CameraUBO cameraUBOData;
+
+VkDescriptorSetLayout modelDescriptorSetLayout = VK_NULL_HANDLE;
+VkDescriptorPool modelDescriptorPool = VK_NULL_HANDLE;
+VkDescriptorSet modelDescriptorSet = VK_NULL_HANDLE;
 // ====================== GLOBALS ======================
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 VkDevice device = VK_NULL_HANDLE;
@@ -53,6 +66,14 @@ VkPipeline uiPipeline = VK_NULL_HANDLE;
 VkPipelineLayout uiPipelineLayout = VK_NULL_HANDLE;
 VkBuffer uiVertexBuffer = VK_NULL_HANDLE;
 VkDeviceMemory uiVertexBufferMemory = VK_NULL_HANDLE;
+VkPipeline modelPipeline = VK_NULL_HANDLE;
+VkPipelineLayout modelPipelineLayout = VK_NULL_HANDLE;
+VkShaderModule modelVertModule = VK_NULL_HANDLE;
+VkShaderModule modelFragModule = VK_NULL_HANDLE;
+VkImage depthImage = VK_NULL_HANDLE;
+VkDeviceMemory depthMemory = VK_NULL_HANDLE;
+VkImageView depthImageView = VK_NULL_HANDLE;
+VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
 // ====================== FORWARD DECLARATIONS ======================
 void init_renderer(VkInstance instance, VkSurfaceKHR surface);
@@ -61,6 +82,42 @@ void draw_frame();
 
 static uint32_t* load_spirv(const char* filename, size_t* out_size);
 static void create_sky_pipeline();
+static void create_depth_resources(void);
+static void create_render_pass(void);           // now creates depth + color
+static void create_model_pipeline(void);
+
+
+// Helper to create buffers (kept simple and consistent with your original style)
+void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                                 VkBuffer* buffer, VkDeviceMemory* memory)
+{
+    VkBufferCreateInfo bufInfo = {0};
+    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufInfo.size = size;
+    bufInfo.usage = usage;
+    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufInfo, NULL, buffer) != VK_SUCCESS) {
+        printf("Failed to create buffer\n");
+        exit(1);
+    }
+
+    VkMemoryRequirements memReq;
+    vkGetBufferMemoryRequirements(device, *buffer, &memReq);
+
+    VkMemoryAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(device, &allocInfo, NULL, memory) != VK_SUCCESS) {
+        printf("Failed to allocate buffer memory\n");
+        exit(1);
+    }
+    vkBindBufferMemory(device, *buffer, *memory, 0);
+}
 
 // ====================== HELPER: LOAD SPIR-V ======================
 static uint32_t* load_spirv(const char* filename, size_t* out_size)
@@ -107,11 +164,11 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
 }
 
 typedef struct { float x, y, u, v; } Vertex;
-Vertex quadVertices[4] = {
-    {-1.f, -1.f, 0.f, 1.f},
+Vertex quadVerts[4] = {
+    {-1.f, -1.f, 0.f, 1.f},   // bottom-left in NDC
     { 1.f, -1.f, 1.f, 1.f},
-    {-1.f,  1.f, 0.f, 0.f},
-    { 1.f,  1.f, 1.f, 0.f},
+    {-1.f,  1.f, 0.f, 0.f},   // top-left in NDC
+    { 1.f,  1.f, 1.f, 0.f}
 };
 
 void create_ui_image() {
@@ -230,11 +287,11 @@ void create_ui_descriptor() {
 }
 
 void create_ui_quad() {
-    float quadVerts[] = {
-        -1.0f, -1.0f, 0.0f, 1.0f,
-         1.0f, -1.0f, 1.0f, 1.0f,
-        -1.0f,  1.0f, 0.0f, 0.0f,
-         1.0f,  1.0f, 1.0f, 0.0f
+    Vertex quadVerts[4] = {
+        {-1.0f, -1.0f, 0.0f, 0.0f},  // bottom-left  → UV (0,0) = top-left of texture
+        { 1.0f, -1.0f, 1.0f, 0.0f},  // bottom-right → UV (1,0)
+        {-1.0f,  1.0f, 0.0f, 1.0f},  // top-left     → UV (0,1) = bottom of texture
+        { 1.0f,  1.0f, 1.0f, 1.0f}   // top-right
     };
 
     VkDeviceSize size = sizeof(quadVerts);
@@ -394,8 +451,8 @@ static VkShaderModule uiFragModule;
 void create_ui_pipeline() {
     size_t vert_size, frag_size;
 
-    uint32_t* vert_code = load_spirv("shaders/ui.vert.spv", &vert_size);
-    uint32_t* frag_code = load_spirv("shaders/ui.frag.spv", &frag_size);
+    uint32_t* vert_code = load_spirv("../../shaders/ui.vert.spv", &vert_size);
+    uint32_t* frag_code = load_spirv("../../shaders/ui.frag.spv", &frag_size);
 
     if (!vert_code || !frag_code) {
         printf("Failed to load UI shaders\n");
@@ -531,8 +588,8 @@ static void create_sky_pipeline()
 {
     // Load shaders (adjust path if needed)
     size_t vert_size, frag_size;
-    uint32_t* vert_code = load_spirv("shaders/sky.vert.spv", &vert_size);
-    uint32_t* frag_code = load_spirv("shaders/sky.frag.spv", &frag_size);
+    uint32_t* vert_code = load_spirv("../../shaders/sky.vert.spv", &vert_size);
+    uint32_t* frag_code = load_spirv("../../shaders/sky.frag.spv", &frag_size);
 
     if (!vert_code || !frag_code) {
         printf("Failed to load sky shaders!\n");
@@ -661,6 +718,335 @@ static void create_sky_pipeline()
     }
 
     printf("Sky pipeline created successfully\n");
+}
+
+static void create_depth_resources(void)
+{
+    VkImageCreateInfo imageInfo = {0};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = swapchainExtent.width;
+    imageInfo.extent.height = swapchainExtent.height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = depthFormat;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    vkCreateImage(device, &imageInfo, NULL, &depthImage);
+
+    VkMemoryRequirements memReq;
+    vkGetImageMemoryRequirements(device, depthImage, &memReq);
+
+    VkMemoryAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vkAllocateMemory(device, &allocInfo, NULL, &depthMemory);
+    vkBindImageMemory(device, depthImage, depthMemory, 0);
+
+    VkImageViewCreateInfo viewInfo = {0};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = depthImage;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = depthFormat;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    vkCreateImageView(device, &viewInfo, NULL, &depthImageView);
+}
+
+void create_model_pipeline(void)
+{
+    size_t vert_size, frag_size;
+    uint32_t* vert_code = load_spirv("../../shaders/model.vert.spv", &vert_size);
+    uint32_t* frag_code = load_spirv("../../shaders/model.frag.spv", &frag_size);
+    if (!vert_code || !frag_code) {
+        printf("Failed to load model shaders!\n");
+        exit(1);
+    }
+
+    VkShaderModuleCreateInfo sm = {0};
+    sm.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+
+    sm.codeSize = vert_size; sm.pCode = vert_code;
+    vkCreateShaderModule(device, &sm, NULL, &modelVertModule);
+    free(vert_code);
+
+    sm.codeSize = frag_size; sm.pCode = frag_code;
+    vkCreateShaderModule(device, &sm, NULL, &modelFragModule);
+    free(frag_code);
+
+    VkPipelineShaderStageCreateInfo stages[2] = {0};
+    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stages[0].module = modelVertModule;
+    stages[0].pName = "main";
+
+    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stages[1].module = modelFragModule;
+    stages[1].pName = "main";
+
+    // Vertex input
+    VkVertexInputBindingDescription binding = {0};
+    binding.binding = 0;
+    binding.stride = sizeof(Vertex3D);
+    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attrs[3] = {0};
+    attrs[0].location = 0; attrs[0].binding = 0; attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT; attrs[0].offset = offsetof(Vertex3D, x);
+    attrs[1].location = 1; attrs[1].binding = 0; attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT; attrs[1].offset = offsetof(Vertex3D, nx);
+    attrs[2].location = 2; attrs[2].binding = 0; attrs[2].format = VK_FORMAT_R32G32_SFLOAT;    attrs[2].offset = offsetof(Vertex3D, u);
+
+    VkPipelineVertexInputStateCreateInfo vertexInput = {0};
+    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInput.vertexBindingDescriptionCount = 1;
+    vertexInput.pVertexBindingDescriptions = &binding;
+    vertexInput.vertexAttributeDescriptionCount = 3;
+    vertexInput.pVertexAttributeDescriptions = attrs;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo viewportState = {0};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo raster = {0};
+    raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster.polygonMode = VK_POLYGON_MODE_FILL;
+    raster.lineWidth = 1.0f;
+    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    VkPipelineMultisampleStateCreateInfo ms = {0};
+    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    // === DEPTH STENCIL (this was missing from pipeInfo) ===
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState blendAttach = {0};
+    blendAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    VkPipelineColorBlendStateCreateInfo blend = {0};
+    blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blend.attachmentCount = 1;
+    blend.pAttachments = &blendAttach;
+
+    VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dyn = {0};
+    dyn.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dyn.dynamicStateCount = 2;
+    dyn.pDynamicStates = dynStates;
+
+    // === NEW: descriptor layout instead of push constant ===
+    VkPipelineLayoutCreateInfo layoutInfo = {0};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.setLayoutCount = 1;
+    layoutInfo.pSetLayouts = &modelDescriptorSetLayout;   // <-- this is the key change
+
+    if (vkCreatePipelineLayout(device, &layoutInfo, NULL, &modelPipelineLayout) != VK_SUCCESS) {
+        printf("Failed to create model pipeline layout\n");
+        exit(1);
+    }
+
+    VkGraphicsPipelineCreateInfo pipeInfo = {0};
+    pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeInfo.stageCount = 2;
+    pipeInfo.pStages = stages;
+    pipeInfo.pVertexInputState = &vertexInput;
+    pipeInfo.pInputAssemblyState = &inputAssembly;
+    pipeInfo.pViewportState = &viewportState;
+    pipeInfo.pRasterizationState = &raster;
+    pipeInfo.pMultisampleState = &ms;
+    pipeInfo.pDepthStencilState = &depthStencil;        // ← THIS WAS MISSING
+    pipeInfo.pColorBlendState = &blend;
+    pipeInfo.pDynamicState = &dyn;
+    pipeInfo.layout = modelPipelineLayout;
+    pipeInfo.renderPass = renderPass;
+    pipeInfo.subpass = 0;
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeInfo, NULL, &modelPipeline) != VK_SUCCESS) {
+        printf("Failed to create model pipeline\n");
+        exit(1);
+    }
+
+    printf("Model pipeline created successfully\n");
+}
+
+// ====================== RENDER PASS (now with depth) ======================
+static void create_render_pass(void)
+{
+    VkAttachmentDescription attachments[2] = {0};
+
+    // Color attachment
+    attachments[0].format = swapchainFormat;
+    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    // Depth attachment
+    attachments[1].format = depthFormat;
+    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorRef = {0};
+    colorRef.attachment = 0;
+    colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthRef = {0};
+    depthRef.attachment = 1;
+    depthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {0};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorRef;
+    subpass.pDepthStencilAttachment = &depthRef;
+
+    VkRenderPassCreateInfo rpInfo = {0};
+    rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    rpInfo.attachmentCount = 2;
+    rpInfo.pAttachments = attachments;
+    rpInfo.subpassCount = 1;
+    rpInfo.pSubpasses = &subpass;
+
+    vkCreateRenderPass(device, &rpInfo, NULL, &renderPass);
+}
+
+// ====================== FRAMEBUFFERS (now include depth) ======================
+static void create_framebuffers(void)
+{
+    framebuffers = malloc(sizeof(VkFramebuffer) * swapchainImageCount);
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        VkImageView attachments[2] = {
+            swapchainImageViews[i],
+            depthImageView
+        };
+
+        VkFramebufferCreateInfo fbInfo = {0};
+        fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        fbInfo.renderPass = renderPass;
+        fbInfo.attachmentCount = 2;
+        fbInfo.pAttachments = attachments;
+        fbInfo.width = swapchainExtent.width;
+        fbInfo.height = swapchainExtent.height;
+        fbInfo.layers = 1;
+
+        vkCreateFramebuffer(device, &fbInfo, NULL, &framebuffers[i]);
+    }
+}
+
+static void create_camera_ubo(void)
+{
+    VkDeviceSize size = sizeof(CameraUBO);
+    create_vulkan_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                         &cameraUBOBuffer, &cameraUBOMemory);
+}
+
+static void create_model_descriptors(void)
+{
+    VkDescriptorSetLayoutBinding bindings[2] = {0};
+
+    // 0: Camera UBO
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    // 1: Instance SSBO
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
+    vkCreateDescriptorSetLayout(device, &layoutInfo, NULL, &modelDescriptorSetLayout);
+
+    VkDescriptorPoolSize poolSizes[2] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}
+    };
+    VkDescriptorPoolCreateInfo poolInfo = {0};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = 1;
+    vkCreateDescriptorPool(device, &poolInfo, NULL, &modelDescriptorPool);
+
+    VkDescriptorSetAllocateInfo allocInfo = {0};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = modelDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &modelDescriptorSetLayout;
+    vkAllocateDescriptorSets(device, &allocInfo, &modelDescriptorSet);
+
+    // Initial camera UBO write
+    VkDescriptorBufferInfo camInfo = { cameraUBOBuffer, 0, sizeof(CameraUBO) };
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = modelDescriptorSet;
+    write.dstBinding = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &camInfo;
+    vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+}
+
+void update_model_descriptor(void)   // public for model.c
+{
+    VkDescriptorBufferInfo instInfo = { g_model.instanceBuffer, 0, g_model.instanceBufferSize };
+    VkWriteDescriptorSet write = {0};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = modelDescriptorSet;
+    write.dstBinding = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &instInfo;
+    vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+}
+
+void update_camera_ubo(void)
+{
+    float view[16], proj[16];
+    camera_get_view_matrix(view);
+    int w, h;
+    glfwGetWindowSize(g_window, &w, &h);
+    camera_get_projection_matrix(proj, (float)w / (float)h);
+
+    memcpy(cameraUBOData.view, view, 16 * sizeof(float));
+    memcpy(cameraUBOData.proj, proj, 16 * sizeof(float));
+
+    void* data;
+    vkMapMemory(device, cameraUBOMemory, 0, sizeof(CameraUBO), 0, &data);
+    memcpy(data, &cameraUBOData, sizeof(CameraUBO));
+    vkUnmapMemory(device, cameraUBOMemory);
 }
 
 // ====================== INIT RENDERER ======================
@@ -822,49 +1208,9 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface)
     memset(ui_framebuffer, 0, 
            (size_t)swapchainExtent.width * swapchainExtent.height * sizeof(uint32_t));
 
-    // Render pass (MUST be created BEFORE pipeline)
-    VkAttachmentDescription colorAttachment = {0};
-    colorAttachment.format = swapchainFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorRef = {0};
-    colorRef.attachment = 0;
-    colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass = {0};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorRef;
-
-    VkRenderPassCreateInfo rpInfo = {0};
-    rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    rpInfo.attachmentCount = 1;
-    rpInfo.pAttachments = &colorAttachment;
-    rpInfo.subpassCount = 1;
-    rpInfo.pSubpasses = &subpass;
-
-    if (vkCreateRenderPass(device, &rpInfo, NULL, &renderPass) != VK_SUCCESS) {
-        printf("Failed to create render pass\n");
-        exit(1);
-    }
-
-    // Framebuffers
-    framebuffers = malloc(sizeof(VkFramebuffer) * swapchainImageCount);
-    for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        VkFramebufferCreateInfo fbInfo = {0};
-        fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        fbInfo.renderPass = renderPass;
-        fbInfo.attachmentCount = 1;
-        fbInfo.pAttachments = &swapchainImageViews[i];
-        fbInfo.width = swapchainExtent.width;
-        fbInfo.height = swapchainExtent.height;
-        fbInfo.layers = 1;
-        vkCreateFramebuffer(device, &fbInfo, NULL, &framebuffers[i]);
-    }
+    create_depth_resources();           // ← new
+    create_render_pass();               // ← updated
+    create_framebuffers();              // ← updated (now 2 attachments)
 
     // Command pool
     VkCommandPoolCreateInfo poolInfo = {0};
@@ -893,12 +1239,17 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface)
         vkCreateFence(device, &fenceInfo, NULL, &inFlightFences[i]);
     }
 
+    create_camera_ubo();
+    create_model_descriptors();
     create_sky_pipeline();
+    create_model_pipeline();
     create_ui_image();
     create_ui_descriptor();
     create_ui_pipeline();
     create_ui_quad();
 
+    init_model_system();
+    update_model_descriptor();         // initial empty buffer
     printf("Renderer initialized\n");
 }
 
@@ -929,9 +1280,12 @@ void draw_frame()
     rpBegin.renderPass = renderPass;
     rpBegin.framebuffer = framebuffers[imageIndex];
     rpBegin.renderArea.extent = swapchainExtent;
-    VkClearValue clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-    rpBegin.clearValueCount = 1;
-    rpBegin.pClearValues = &clearValue;
+    VkClearValue clearValues[2] = {
+        {{{0.0f, 0.0f, 0.0f, 1.0f}}},   // color
+        {{{1.0f, 0}}}                    // depth = 1.0, stencil = 0
+    };
+    rpBegin.clearValueCount = 2;
+    rpBegin.pClearValues = clearValues;
 
     vkCmdBeginRenderPass(commandBuffers[currentFrame], &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -962,6 +1316,17 @@ void draw_frame()
                        0, sizeof(SkyPushConstant), &push);
 
     vkCmdDraw(commandBuffers[currentFrame], 4, 1, 0, 0);
+    
+    update_camera_ubo();
+
+    // 2. 3D Models
+    if (g_model.meshCount > 0) {
+        vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline);
+
+        draw_models(commandBuffers[currentFrame]);
+    }
+
+    // 3. UI (unchanged)
 
     if (ui_ctx.cursor_captured) {
         // Update CPU framebuffer
@@ -1013,6 +1378,14 @@ void draw_frame()
 void cleanup_renderer()
 {
     vkDeviceWaitIdle(device);
+
+    cleanup_model_system();
+
+    vkDestroyBuffer(device, cameraUBOBuffer, NULL);
+    vkFreeMemory(device, cameraUBOMemory, NULL);
+
+    vkDestroyDescriptorSetLayout(device, modelDescriptorSetLayout, NULL);
+    vkDestroyDescriptorPool(device, modelDescriptorPool, NULL);
 
     vkDestroyPipeline(device, skyPipeline, NULL);
     vkDestroyPipelineLayout(device, skyPipelineLayout, NULL);

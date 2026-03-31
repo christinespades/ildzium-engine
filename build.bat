@@ -26,7 +26,7 @@ echo === Compiling Ildzium Engine ===
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 
-cl main.c renderer.c camera.c input.c ui.c ^
+cl main.c renderer.c camera.c input.c ui.c model.c ^
     /Zi /W3 /MD /nologo ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^

@@ -117,3 +117,7 @@ Copyright © 2024-2026 Christine Spades. All rights reserved.
 This repository is proprietary software. Unauthorized copying, modification, redistribution, hosting, or commercial use is strictly prohibited.
 
 No license is granted except by explicit written permission from the author.
+
+## TODO
+A version of MVP that supports per-model translation/rotation/scale
+Or improvements to the fragment shader (e.g. better lighting or texture support)
