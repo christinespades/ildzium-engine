@@ -27,9 +27,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
     if (ui_ctx.cursor_captured)
         return;
-    
+
     camera.yaw   += xoffset;
-    camera.pitch += yoffset;
+    camera.pitch -= yoffset;
 
     if (camera.pitch > 89.0f)  camera.pitch = 89.0f;
     if (camera.pitch < -89.0f) camera.pitch = -89.0f;

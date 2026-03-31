@@ -18,15 +18,23 @@ set GLFW_DLL=thirdparty\GLFW\glfw3.dll
 :: Create build directory
 if not exist %BUILD_DIR% mkdir %BUILD_DIR%
 
+echo === Optimizing meshes ===
+call "bat\optimize_meshes.bat"
+if errorlevel 1 (
+    echo Mesh optimization FAILED!
+    pause
+    exit /b
+)
+
 echo === Compiling shaders ===
-call compile_shaders.bat
+call "bat\compile_shaders.bat"
 
 echo.
 echo === Compiling Ildzium Engine ===
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 
-cl main.c renderer.c camera.c input.c ui.c model.c ^
+cl /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 main.c camera.c input.c memory.c model.c renderer.c shaders.c ui.c ui_renderer.c ^
     /Zi /W3 /MD /nologo ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^

@@ -223,45 +223,39 @@ static void draw_text(uint32_t* fb, int fb_w, int fb_h, const char* text, int x,
 void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height) {
     if (!ctx->cursor_captured) return;
 
-    // Clear to fully transparent
     memset(fb, 0, (size_t)fb_width * fb_height * sizeof(uint32_t));
 
     for (int i = 0; i < ctx->button_count; i++) {
         UI_Button* b = &ctx->buttons[i];
 
-        // 1. Semi-transparent dark panel
         uint32_t panel_color = 0xB4000000;
         draw_rect(fb, fb_width, fb_height, b->x, b->y, b->w, b->h, panel_color);
 
-        // 2. Border
         uint32_t border_color = 0x80FFFFFF;
-        draw_rect(fb, fb_width, fb_height, b->x,         b->y,         b->w, 2, border_color); // top
-        draw_rect(fb, fb_width, fb_height, b->x,         b->y + b->h - 2, b->w, 2, border_color); // bottom
-        draw_rect(fb, fb_width, fb_height, b->x,         b->y,         2, b->h, border_color); // left
-        draw_rect(fb, fb_width, fb_height, b->x + b->w - 2, b->y, 2, b->h, border_color); // right
+        draw_rect(fb, fb_width, fb_height, b->x, b->y, b->w, 2, border_color);
+        draw_rect(fb, fb_width, fb_height, b->x, b->y + b->h - 2, b->w, 2, border_color);
+        draw_rect(fb, fb_width, fb_height, b->x, b->y, 2, b->h, border_color);
+        draw_rect(fb, fb_width, fb_height, b->x + b->w - 2, b->y, 2, b->h, border_color);
 
-        // 3. Calculate best scale and position for text (75% width usage)
         if (b->text && b->text[0]) {
-            int text_len = strlen(b->text);
-            int text_pixel_width = text_len * 8;        // base width in font pixels
-            int text_pixel_height = 8;                  // base height
+            int text_len = (int)strlen(b->text);
+            int char_w = 8, char_h = 8;
 
-            // Target width = 75% of button interior (after border/padding)
-            int available_width = b->w - 20;            // 10px padding on each side
-            int scale = available_width / text_pixel_width;
+            int available_w = b->w - 20;
+            int available_h = b->h - 20;
+
+            int scale_w = available_w / (text_len * char_w);
+            int scale_h = available_h / char_h;
+            int scale = scale_w < scale_h ? scale_w : scale_h;
 
             if (scale < 1) scale = 1;
-            if (scale > 8) scale = 8;                   // prevent ridiculous scaling
+            if (scale > 8) scale = 8;
 
-            int scaled_width = text_pixel_width * scale;
-            int scaled_height = text_pixel_height * scale;
+            int scaled_w = text_len * char_w * scale;
+            int scaled_h = char_h * scale;
 
-            // Center horizontally and vertically
-            int text_x = b->x + (b->w - scaled_width) / 2;
-            int text_y = b->y + (b->h - scaled_height) / 2;
-
-            // Optional: slight vertical adjustment for better visual centering
-            text_y -= scale / 2;
+            int text_x = b->x + (b->w - scaled_w) / 2;
+            int text_y = b->y + (b->h - scaled_h) / 2;
 
             draw_text(fb, fb_width, fb_height, b->text, text_x, text_y, 0xFFFFFFFF, scale);
         }

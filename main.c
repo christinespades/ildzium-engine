@@ -54,9 +54,9 @@ int main()
     create_surface();
 
     init_renderer(vk_instance, vk_surface);
-    
+
     init_model_system();
-    load_model("../../meshes/cs_goddess_statue.glb");
+    load_model("../../meshes/cs_goddess_statue_opt.glb");
     // Add many instances
     for (int i = 0; i < 200; i++) {
         float transform[16] = {0}; // fill with your TRS matrix

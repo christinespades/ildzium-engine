@@ -1,4 +1,6 @@
 #define CGLTF_IMPLEMENTATION
+#define CGLTF_MESHOPT_DECODE 1
+#define MESHOPTIMIZER_IMPLEMENTATION
 #include "cgltf.h"
 #include "model.h"
 #include "renderer.h" 
