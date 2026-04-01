@@ -38,7 +38,7 @@ call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build
 set "SRC_FILES="
 for %%f in (*.c) do set "SRC_FILES=!SRC_FILES! %%f"
 
-cl /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 %SRC_FILES% ^
+cl /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 /wd4244 %SRC_FILES% ^
     /Zi /W3 /MD /nologo ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^

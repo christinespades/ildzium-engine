@@ -119,16 +119,14 @@ This repository is proprietary software. Unauthorized copying, modification, red
 No license is granted except by explicit written permission from the author.
 
 ## TODO
-sky_set_time_of_day(0.5f);        // force noon
-g_skyParams.cycleSpeed = 0.0f;    // manual control only
-g_skyParams.nebulaIntensity = 0.9f;
-
+fix sky up/down thing, is passing aspect by UBO needed?
+adjust clamps of params
 sun/moon disc, horizon glow, or more advanced scattering next
-
 move model renderer out of renderer
+
 variable skybox, button mappings, event system
 events.c to handle all buttons etc, button to change color of sky etc
-hold down button to cyle through faster and faster
+hold down button to cycle through faster and faster
 plan the menu system, input, levels
 levels.c
 A version of MVP that supports per-model translation/rotation/scale

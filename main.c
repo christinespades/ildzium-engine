@@ -20,36 +20,10 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface);
 void cleanup_renderer();
 void draw_frame();
 
-void on_button_clicked(void) {
-    printf("Button CLICKED!\n");
-}
-
-void on_button_held(void) {
-    // printf("Button HELD\n");   // uncomment if you want to see it (spammy)
-}
-
-void on_button_released(void) {
-    printf("Button RELEASED\n");
-}
-
-void init_ui(void) {
-    ui_init(&ui_ctx);
-
-    ui_add_button(&ui_ctx, 250, 250, 380, 324, "Click Me",
-                  on_button_clicked,      // on_click
-                  on_button_held,         // on_held
-                  on_button_released);    // on_release
-
-    ui_add_button(&ui_ctx, 750, 750, 180, 324, "Click Me As Well",
-                  on_button_clicked,
-                  on_button_held,
-                  on_button_released);
-}
-
 int main()
 {
     init_glfw();
-    init_ui();
+    ui_init(&ui_ctx);
     create_vulkan_instance();
     create_surface();
 

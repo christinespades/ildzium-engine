@@ -1,31 +1,37 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 echo Compiling shaders...
 
 if not exist shaders mkdir shaders
 
-set GLSLC="%VULKAN_SDK%\Bin\glslc.exe"
+set GLSLC=%VULKAN_SDK%\Bin\glslc.exe
+set SHADER_DIR=%CD%\shaders
 
-if not exist %GLSLC% (
-    echo ERROR: glslc.exe not found! Make sure Vulkan SDK is installed and VULKAN_SDK is set.
+if not exist "%GLSLC%" (
+    echo ERROR: glslc.exe not found!
     pause
     exit /b 1
 )
 
-:: Only compile if source exists and spv is missing or older
-set SHADERS=sky.vert sky.frag ui.vert ui.frag model.vert model.frag
+for %%F in ("%SHADER_DIR%\*.vert" "%SHADER_DIR%\*.frag") do (
+    set "INPUT=%%~fF"
+    set "OUTPUT=%SHADER_DIR%\%%~nxF.spv"
 
-for %%S in (%SHADERS%) do (
-    if exist shaders\%%S (
-        if not exist shaders\%%S.spv (
-            echo Compiling %%S...
-            %GLSLC% shaders\%%S -o shaders\%%S.spv
-        ) else (
-            echo %%S.spv already exists.
-        )
+    if not exist "!OUTPUT!" (
+        echo Compiling %%~nxF...
+        "%GLSLC%" "!INPUT!" -o "!OUTPUT!"
     ) else (
-        echo WARNING: shaders/%%S not found!
+        rem Optional: recompile if source is newer
+        for %%A in ("!INPUT!") do for %%B in ("!OUTPUT!") do (
+            if %%~tA GTR %%~tB (
+                echo Recompiling %%~nxF...
+                "%GLSLC%" "!INPUT!" -o "!OUTPUT!"
+            ) else (
+                echo %%~nxF is up to date.
+            )
+        )
     )
 )
+
 echo Shader compilation done.

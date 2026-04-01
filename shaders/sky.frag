@@ -22,9 +22,9 @@ layout(set = 0, binding = 0) uniform SkyUBO {
     float auroraIntensity;
     float auroraSpeed;
 
-    vec3 nebulaColorNight;
-    vec3 nebulaColorDay;
-    vec3 auroraColor;
+    vec4 nebulaColorNight; 
+    vec4 nebulaColorDay;
+    vec4 auroraColor;
 
     float vignetteStrength;
     float overallBrightness;
@@ -48,26 +48,42 @@ float noise(vec3 p) {
 }
 
 void main() {
+    // 1. Correct Aspect Ratio (optional but prevents stretching)
+    // float aspect = 1920.0 / 1080.0; // Use actual resolution or pass via UBO
     vec2 uv = vUV * 2.0 - 1.0;
+    // uv.x *= aspect; 
 
-    float t = ubo.time * 0.03;
+    // 2. Generate initial ray direction (Forward is Z+)
+    // Imagine a plane in front of the camera with a 90-degree FOV
+    vec3 rd = normalize(vec3(uv, 1.5)); 
 
-    // Camera direction
-    float cy = cos(ubo.pitch), sy = sin(ubo.pitch);
-    float cx = cos(ubo.yaw),   sx = sin(ubo.yaw);
-    vec3 dir = normalize(vec3(uv.x * cx - uv.y * sx * sy,
-                              uv.y * cy,
-                             -uv.x * sx - uv.y * cx * sy));
+    // 3. Rotate ray by Pitch (around X axis)
+    float cp = cos(ubo.pitch), sp = sin(ubo.pitch);
+    vec3 rayPitch = vec3(
+        rd.x,
+        rd.y * cp - rd.z * sp,
+        rd.y * sp + rd.z * cp
+    );
 
+    // 4. Rotate ray by Yaw (around Y axis)
+    float cy = cos(ubo.yaw), sy = sin(ubo.yaw);
+    vec3 dir = vec3(
+        rayPitch.x * cy + rayPitch.z * sy,
+        rayPitch.y,
+        -rayPitch.x * sy + rayPitch.z * cy
+    );
+
+    // Use 'dir' for all your noise and star calculations
+    float t = ubo.time;
     vec3 col = vec3(0.0);
 
-    // Nebula with day/night color lerp
-    vec3 nebulaColor = mix(ubo.nebulaColorNight, ubo.nebulaColorDay, ubo.dayNightBlend);
+    // Nebula - using .rgb since we switched to vec4
+    vec3 nebulaColor = mix(ubo.nebulaColorNight.rgb, ubo.nebulaColorDay.rgb, ubo.dayNightBlend);
     for (float i = 0.0; i < ubo.nebulaLayerCount; i++) {
-        vec3 p = dir * (2.2 + i * 0.9) + vec3(t * 0.12, t * 0.08, t * 0.15);
+        vec3 p = dir * (2.2 + i * 0.9) + vec3(t * 0.02, t * 0.01, t * 0.03);
         float n = noise(p * ubo.nebulaScale);
         n = pow(n, 2.1) * 0.75;
-        col += nebulaColor * n * ubo.nebulaIntensity * (0.6 + 0.4 * ubo.dayNightBlend);
+        col += nebulaColor.rgb * n * ubo.nebulaIntensity * (0.6 + 0.4 * ubo.dayNightBlend);
     }
 
     // Stars (stronger at night)
@@ -83,7 +99,7 @@ void main() {
 
     // Aurora (only at night)
     float aurora = sin(dir.y * 7.0 + t * ubo.auroraSpeed) * 0.5 + 0.5;
-    col += ubo.auroraColor * aurora * ubo.auroraIntensity * (1.0 - ubo.dayNightBlend);
+    col += ubo.auroraColor.rgb * aurora * ubo.auroraIntensity * (1.0 - ubo.dayNightBlend);
 
     // Vignette
     col *= 1.0 - length(uv) * ubo.vignetteStrength;

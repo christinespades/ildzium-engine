@@ -1,6 +1,7 @@
 #include "sky.h"
 #include "camera.h"
 #include "shaders.h"   // assumes load_spirv is here
+#include "ui.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +53,66 @@ VkPipeline skyPipeline = VK_NULL_HANDLE;
 VkPipelineLayout skyPipelineLayout = VK_NULL_HANDLE;
 VkShaderModule vertShaderModule = VK_NULL_HANDLE;
 VkShaderModule fragShaderModule = VK_NULL_HANDLE;
+
+void setup_sky_tuners(void)
+{
+    float btn_w = 380;
+    float btn_h = 70;        // slightly taller so value fits nicely
+    float start_x = 250;
+    float start_y = 100;
+    float spacing = 80;      // increased a bit for better readability
+    int idx = 0;
+
+    ui_add_tuner(&ui_ctx, start_x + 400, start_y + 4 * spacing, btn_w, btn_h, "Aurora R", &g_skyParams.auroraColor[0], 0.02f, 0.0f, 1.0f);
+    ui_add_tuner(&ui_ctx, start_x + 400, start_y + 5 * spacing, btn_w, btn_h, "Aurora G", &g_skyParams.auroraColor[1], 0.02f, 0.0f, 1.0f);
+    ui_add_tuner(&ui_ctx, start_x + 400, start_y + 6 * spacing, btn_w, btn_h, "Aurora B", &g_skyParams.auroraColor[2], 0.02f, 0.0f, 1.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Aurora Intensity", &g_skyParams.auroraIntensity, 0.01f, 0.0f, 2.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Aurora Speed", &g_skyParams.auroraSpeed, 0.1f, 0.0f, 5.0f);
+    
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Brightness", &g_skyParams.overallBrightness, 0.05f, 0.2f, 3.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Cycle Speed", &g_skyParams.cycleSpeed, 0.01f, 0.0f, 2.0f);
+
+    ui_add_tuner(&ui_ctx, start_x + 400, start_y + 0 * spacing, btn_w, btn_h, "Nebula Night R", &g_skyParams.nebulaColor1[0], 0.02f, 0.0f, 1.0f);
+    ui_add_tuner(&ui_ctx, start_x + 400, start_y + 1 * spacing, btn_w, btn_h, "Nebula Night G", &g_skyParams.nebulaColor1[1], 0.02f, 0.0f, 1.0f);
+    ui_add_tuner(&ui_ctx, start_x + 400, start_y + 2 * spacing, btn_w, btn_h, "Nebula Night B", &g_skyParams.nebulaColor1[2], 0.02f, 0.0f, 1.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Nebula Intensity", &g_skyParams.nebulaIntensity, 0.02f, 0.0f, 3.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Nebula Speed", &g_skyParams.nebulaSpeed, 0.1f, 0.0f, 10.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Nebula Scale", &g_skyParams.nebulaScale, 0.05f, 0.5f, 10.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Nebula Layers", &g_skyParams.nebulaLayerCount, 0.2f, 1.0f, 8.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Star Count", &g_skyParams.starCount, 5.0f, 0.0f, 500.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Star Brightness", &g_skyParams.starBrightness, 0.05f, 0.0f, 5.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Star Twinkle", &g_skyParams.starTwinkleSpeed, 0.5f, 0.0f, 20.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Star Size", &g_skyParams.starSize, 0.01f, 0.01f, 0.5f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Time of Day", &g_skyParams.timeOfDay, 0.005f, 0.0f, 1.0f);
+
+    ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
+                 "Vignette", &g_skyParams.vignetteStrength, 0.02f, 0.0f, 1.5f);
+}
 
 static void create_sky_ubo(void)
 {
@@ -149,12 +210,15 @@ static void create_sky_pipeline(void)
 
     VkPipelineDepthStencilStateCreateInfo depthStencil = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_FALSE, .depthWriteEnable = VK_FALSE
+        .depthTestEnable = VK_FALSE,
+        .depthWriteEnable = VK_FALSE,
+        .depthCompareOp = VK_COMPARE_OP_ALWAYS,
     };
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {
         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        .blendEnable = VK_FALSE, // Explicitly false
     };
 
     VkPipelineColorBlendStateCreateInfo colorBlending = {
@@ -208,6 +272,7 @@ void sky_init(void)
     create_sky_ubo();
     create_sky_descriptors();
     create_sky_pipeline();
+    setup_sky_tuners();
 }
 
 void sky_cleanup(void)
@@ -227,49 +292,51 @@ void sky_update(void)
 {
     // Auto cycle
     if (g_skyParams.cycleSpeed > 0.0f) {
-        g_skyParams.timeOfDay += 0.0005f * g_skyParams.cycleSpeed;  // tweak multiplier for desired speed
+        g_skyParams.timeOfDay += 0.0005f * g_skyParams.cycleSpeed;
         if (g_skyParams.timeOfDay > 1.0f) g_skyParams.timeOfDay -= 1.0f;
     }
 
-    // Simple day/night blend: smooth transition around sunrise/sunset
-    float blend = (sin(g_skyParams.timeOfDay * 6.283185f - 1.57f) + 1.0f) * 0.5f; // 0 at night, 1 at day
+    // Day/night blend
+    float blend = (sinf(g_skyParams.timeOfDay * 6.283185f - 1.57f) + 1.0f) * 0.5f;
     g_skyParams.dayNightBlend = blend;
 
-    // Fill UBO
     static float accumTime = 0.0f;
     accumTime += 0.016f;
 
-    skyUBOData.time             = accumTime;
-    skyUBOData.yaw              = camera.yaw   * 0.0174532925f;
-    skyUBOData.pitch            = camera.pitch * 0.0174532925f;
-    skyUBOData.timeOfDay        = g_skyParams.timeOfDay;
-    skyUBOData.dayNightBlend    = g_skyParams.dayNightBlend;
+    skyUBOData.time = accumTime;
+    skyUBOData.yaw = camera.yaw * 0.0174532925f;
+    skyUBOData.pitch = camera.pitch * 0.0174532925f;
 
-    skyUBOData.nebulaScale      = g_skyParams.nebulaScale;
-    skyUBOData.nebulaIntensity  = g_skyParams.nebulaIntensity;
+    skyUBOData.timeOfDay = g_skyParams.timeOfDay;
+    skyUBOData.dayNightBlend = g_skyParams.dayNightBlend;
+
+    skyUBOData.nebulaScale = g_skyParams.nebulaScale;
+    skyUBOData.nebulaIntensity = g_skyParams.nebulaIntensity;
     skyUBOData.nebulaLayerCount = g_skyParams.nebulaLayerCount;
+    skyUBOData.nebulaSpeed = g_skyParams.nebulaSpeed;
 
-    skyUBOData.starCount        = g_skyParams.starCount;
-    skyUBOData.starBrightness   = g_skyParams.starBrightness;
+    skyUBOData.starCount = g_skyParams.starCount;
+    skyUBOData.starBrightness = g_skyParams.starBrightness;
     skyUBOData.starTwinkleSpeed = g_skyParams.starTwinkleSpeed;
-    skyUBOData.starSize         = g_skyParams.starSize;
+    skyUBOData.starSize = g_skyParams.starSize;
 
-    skyUBOData.auroraIntensity  = g_skyParams.auroraIntensity;
-    skyUBOData.auroraSpeed      = g_skyParams.auroraSpeed;
+    skyUBOData.auroraIntensity = g_skyParams.auroraIntensity;
+    skyUBOData.auroraSpeed = g_skyParams.auroraSpeed;
 
-    // Night / Day nebula colors
-    float nightCol[3] = {0.55f, 0.25f, 0.85f};
-    float dayCol[3]   = {0.65f, 0.75f, 1.0f};
-    memcpy(skyUBOData.nebulaColorNight, nightCol, sizeof(float)*3);
-    memcpy(skyUBOData.nebulaColorDay,   dayCol,   sizeof(float)*3);
+    // Clear and Copy Colors (Ensure the 4th float is 1.0 or 0.0)
+    memset(skyUBOData.nebulaColorNight, 0, sizeof(float)*4);
+    memcpy(skyUBOData.nebulaColorNight, g_skyParams.nebulaColor1, sizeof(float)*3);
 
-    float auroraCol[3] = {0.35f, 0.9f, 0.75f};
-    memcpy(skyUBOData.auroraColor, auroraCol, sizeof(float)*3);
+    memset(skyUBOData.nebulaColorDay, 0, sizeof(float)*4);
+    memcpy(skyUBOData.nebulaColorDay, g_skyParams.nebulaColor2, sizeof(float)*3);
+
+    memset(skyUBOData.auroraColor, 0, sizeof(float)*4);
+    memcpy(skyUBOData.auroraColor, g_skyParams.auroraColor, sizeof(float)*3);
 
     skyUBOData.vignetteStrength = g_skyParams.vignetteStrength;
     skyUBOData.overallBrightness = g_skyParams.overallBrightness;
 
-    // Upload to GPU
+    // Upload
     void* data;
     vkMapMemory(device, skyUBOMemory, 0, sizeof(SkyUBO), 0, &data);
     memcpy(data, &skyUBOData, sizeof(SkyUBO));
@@ -285,16 +352,5 @@ void sky_draw(VkCommandBuffer cmd)
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     VkRect2D scissor = {{0,0}, swapchainExtent};
     vkCmdSetScissor(cmd, 0, 1, &scissor);
-
     vkCmdDraw(cmd, 4, 1, 0, 0);
-}
-
-void sky_set_time_of_day(float tod)
-{
-    g_skyParams.timeOfDay = fmodf(tod, 1.0f);
-}
-
-void sky_set_cycle_speed(float speed)
-{
-    g_skyParams.cycleSpeed = speed;
 }

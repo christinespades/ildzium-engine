@@ -40,35 +40,28 @@ extern SkyParameters g_skyParams;   // global, you can tweak this anywhere
 
 // Vulkan UBO for the sky (contains all dynamic parameters + camera rotation)
 typedef struct {
-    float time;             // absolute animated time
-    float yaw;              // camera yaw in radians
-    float pitch;            // camera pitch in radians
-    float timeOfDay;        // 0..1 cycle
-    float dayNightBlend;    // 0 = night, 1 = day
-
-    // Nebula
+    float time;
+    float yaw;
+    float pitch;
+    float timeOfDay;
+    float dayNightBlend;
+    float nebulaSpeed;
     float nebulaScale;
     float nebulaIntensity;
     float nebulaLayerCount;
-
-    // Stars
     float starCount;
     float starBrightness;
     float starTwinkleSpeed;
     float starSize;
-
-    // Aurora
     float auroraIntensity;
     float auroraSpeed;
-
-    // Colors (day and night versions)
-    float nebulaColorNight[3];
-    float nebulaColorDay[3];
-    float auroraColor[3];
-
+    float pad0;               // 16-byte alignment padding for the next vec4
+    float nebulaColorNight[4]; // Must be 4 floats
+    float nebulaColorDay[4];   // Must be 4 floats
+    float auroraColor[4];      // Must be 4 floats
     float vignetteStrength;
     float overallBrightness;
-    float pad[2];           // alignment
+    float pad1, pad2;          // Pad the end to 16-byte multiple
 } SkyUBO;
 
 extern VkPipeline skyPipeline;
@@ -80,8 +73,3 @@ void sky_init(void);
 void sky_cleanup(void);
 void sky_draw(VkCommandBuffer cmd);          // call this instead of the old inline sky code
 void sky_update(void);                  // call every frame before drawing
-
-// Helpers
-void sky_set_time_of_day(float tod);    // 0.0 = midnight ... 0.5 = noon
-void sky_set_cycle_speed(float speed);  // 0 = manual control only
-void sky_set_nebula_colors(const float col1[3], const float col2[3]);
