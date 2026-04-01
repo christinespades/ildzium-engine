@@ -4,18 +4,13 @@
 #include <string.h>   // for memset
 #include <GLFW/glfw3.h>
 #include "camera.h"
+#include "device.h"
 #include "ui.h"
 #include "ui_renderer.h"
 #include "memory.h"
 #include "model.h"
 #include "shaders.h"
-
-// Push constant for sky (time + camera rotation)
-typedef struct {
-    float time;
-    float yaw;      // in radians
-    float pitch;    // in radians
-} SkyPushConstant;
+#include "sky.h"
 
 typedef struct {
     float view[16];
@@ -29,10 +24,7 @@ CameraUBO cameraUBOData;
 VkDescriptorSetLayout modelDescriptorSetLayout = VK_NULL_HANDLE;
 VkDescriptorPool modelDescriptorPool = VK_NULL_HANDLE;
 VkDescriptorSet modelDescriptorSet = VK_NULL_HANDLE;
-// ====================== GLOBALS ======================
-VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-VkDevice device = VK_NULL_HANDLE;
-VkQueue graphicsQueue = VK_NULL_HANDLE;
+
 VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 VkFormat swapchainFormat;
 VkExtent2D swapchainExtent;
@@ -42,19 +34,12 @@ VkImageView* swapchainImageViews = NULL;
 VkImage* swapchainImages = NULL;
 VkCommandPool commandPool = VK_NULL_HANDLE;
 uint32_t swapchainImageCount = 0;
-uint32_t queueFamilyIndex = 0;
 #define MAX_FRAMES_IN_FLIGHT 2
 VkSemaphore imageAvailable[MAX_FRAMES_IN_FLIGHT];
 VkSemaphore renderFinished[MAX_FRAMES_IN_FLIGHT];
 VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
 VkCommandBuffer commandBuffers[MAX_FRAMES_IN_FLIGHT];
 uint32_t currentFrame = 0;
-
-// New for sky
-VkPipeline skyPipeline = VK_NULL_HANDLE;
-VkPipelineLayout skyPipelineLayout = VK_NULL_HANDLE;
-VkShaderModule vertShaderModule = VK_NULL_HANDLE;
-VkShaderModule fragShaderModule = VK_NULL_HANDLE;
 
 VkPipeline modelPipeline = VK_NULL_HANDLE;
 VkPipelineLayout modelPipelineLayout = VK_NULL_HANDLE;
@@ -74,7 +59,6 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface);
 void cleanup_renderer();
 void draw_frame();
 
-static void create_sky_pipeline();
 static void create_depth_resources(void);
 static void create_render_pass(void);           // depth + color
 static void create_model_pipeline(void);
@@ -109,143 +93,6 @@ void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
         exit(1);
     }
     vkBindBufferMemory(device, *buffer, *memory, 0);
-}
-
-// ====================== PIPELINE CREATION ======================
-static void create_sky_pipeline()
-{
-    // Load shaders (adjust path if needed)
-    size_t vert_size, frag_size;
-    uint32_t* vert_code = load_spirv("../../shaders/sky.vert.spv", &vert_size);
-    uint32_t* frag_code = load_spirv("../../shaders/sky.frag.spv", &frag_size);
-
-    if (!vert_code || !frag_code) {
-        printf("Failed to load sky shaders!\n");
-        exit(1);
-    }
-
-    VkShaderModuleCreateInfo vertCreate = {0};
-    vertCreate.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vertCreate.codeSize = vert_size;
-    vertCreate.pCode = vert_code;
-    vkCreateShaderModule(device, &vertCreate, NULL, &vertShaderModule);
-    free(vert_code);
-
-    VkShaderModuleCreateInfo fragCreate = {0};
-    fragCreate.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    fragCreate.codeSize = frag_size;
-    fragCreate.pCode = frag_code;
-    vkCreateShaderModule(device, &fragCreate, NULL, &fragShaderModule);
-    free(frag_code);
-
-    // Shader stages
-    VkPipelineShaderStageCreateInfo shaderStages[2] = {0};
-
-    shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    shaderStages[0].module = vertShaderModule;
-    shaderStages[0].pName = "main";
-
-    shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStages[1].module = fragShaderModule;
-    shaderStages[1].pName = "main";
-
-    // No vertex input (we use gl_VertexIndex)
-    VkPipelineVertexInputStateCreateInfo vertexInput = {0};
-    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-    // Input assembly - triangle list
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    // Viewport & scissor (dynamic, but we set full screen)
-    VkPipelineViewportStateCreateInfo viewportState = {0};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    // Rasterizer
-    VkPipelineRasterizationStateCreateInfo rasterizer = {0};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
-
-    // Multisampling off
-    VkPipelineMultisampleStateCreateInfo multisampling = {0};
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    // Depth/stencil - disabled for sky
-    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
-    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_FALSE;
-    depthStencil.depthWriteEnable = VK_FALSE;
-
-    // Color blend - simple replace
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {0};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-    VkPipelineColorBlendStateCreateInfo colorBlending = {0};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-
-    // Dynamic state (viewport + scissor)
-    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-    VkPipelineDynamicStateCreateInfo dynamicState = {0};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.dynamicStateCount = 2;
-    dynamicState.pDynamicStates = dynamicStates;
-
-    // Push constant for time (float)
-    VkPushConstantRange pushConstant = {0};
-    pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    pushConstant.offset = 0;
-    pushConstant.size = sizeof(SkyPushConstant);   // time
-
-    // Pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
-
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &skyPipelineLayout) != VK_SUCCESS) {
-        printf("Failed to create pipeline layout\n");
-        exit(1);
-    }
-
-    // Create graphics pipeline
-    VkGraphicsPipelineCreateInfo pipelineInfo = {0};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInput;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = skyPipelineLayout;
-    pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0;
-
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &skyPipeline) != VK_SUCCESS) {
-        printf("Failed to create sky pipeline\n");
-        exit(1);
-    }
-
-    printf("Sky pipeline created successfully\n");
 }
 
 static void create_depth_resources(void)
@@ -354,14 +201,13 @@ void create_model_pipeline(void)
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.polygonMode = VK_POLYGON_MODE_FILL;
     raster.lineWidth = 1.0f;
-    raster.cullMode = VK_CULL_MODE_NONE;
+    raster.cullMode = VK_CULL_MODE_BACK_BIT;
     raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
     VkPipelineMultisampleStateCreateInfo ms = {0};
     ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // === DEPTH STENCIL (this was missing from pipeInfo) ===
     VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
@@ -405,7 +251,7 @@ void create_model_pipeline(void)
     pipeInfo.pViewportState = &viewportState;
     pipeInfo.pRasterizationState = &raster;
     pipeInfo.pMultisampleState = &ms;
-    pipeInfo.pDepthStencilState = &depthStencil;        // ← THIS WAS MISSING
+    pipeInfo.pDepthStencilState = &depthStencil;
     pipeInfo.pColorBlendState = &blend;
     pipeInfo.pDynamicState = &dyn;
     pipeInfo.layout = modelPipelineLayout;
@@ -584,57 +430,8 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface)
         free(ui_framebuffer);           // avoid memory leak if called multiple times
     }
 
-    // Physical device
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
-    if (deviceCount == 0) { 
-        printf("No GPU with Vulkan support found\n"); 
-        exit(1); 
-    }
-
-    VkPhysicalDevice devices[16];
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices);
-    physicalDevice = devices[0];
-
-    // Queue family
-    uint32_t count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, NULL);
-    VkQueueFamilyProperties* props = malloc(sizeof(VkQueueFamilyProperties) * count);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, props);
-
-    queueFamilyIndex = 0;
-    for (uint32_t i = 0; i < count; i++) {
-        VkBool32 presentSupport = VK_FALSE;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentSupport);
-        if ((props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && presentSupport) {
-            queueFamilyIndex = i;
-            break;
-        }
-    }
-    free(props);
-
-    // Logical device
-    float queuePriority = 1.0f;
-    VkDeviceQueueCreateInfo queueCreateInfo = {0};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
-
-    const char* deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
-    VkDeviceCreateInfo deviceCreateInfo = {0};
-    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.queueCreateInfoCount = 1;
-    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.enabledExtensionCount = 1;
-    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
-
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device) != VK_SUCCESS) {
-        printf("Failed to create logical device\n"); 
-        exit(1);
-    }
-    vkGetDeviceQueue(device, queueFamilyIndex, 0, &graphicsQueue);
+    pick_physical_device(instance, surface);
+    create_logical_device();
 
     // === SWAPCHAIN ===
     VkSurfaceCapabilitiesKHR surfaceCaps;
@@ -769,8 +566,8 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface)
 
     create_camera_ubo();
     create_model_descriptors();
-    create_sky_pipeline();
     create_model_pipeline();
+    sky_init();
     ui_renderer_init();
 
     init_model_system();
@@ -814,34 +611,10 @@ void draw_frame()
 
     vkCmdBeginRenderPass(commandBuffers[currentFrame], &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipeline);
+    // 1. Sky (now handled in its own module)
+    sky_update();
+    sky_draw(commandBuffers[currentFrame]);
 
-    VkViewport viewport = {0};
-    viewport.x = 0.0f; viewport.y = 0.0f;
-    viewport.width = (float)swapchainExtent.width;
-    viewport.height = (float)swapchainExtent.height;
-    viewport.minDepth = 0.0f; viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffers[currentFrame], 0, 1, &viewport);
-
-    VkRect2D scissor = {{0,0}, swapchainExtent};
-    vkCmdSetScissor(commandBuffers[currentFrame], 0, 1, &scissor);
-
-    // Push constants: time + camera yaw/pitch
-    SkyPushConstant push = {0};
-    static float time = 0.0f;
-    time += 0.016f;
-
-    push.time  = time;
-    push.yaw   = camera.yaw   * 0.0174532925f;   // degrees to radians
-    push.pitch = camera.pitch * 0.0174532925f;
-
-    vkCmdPushConstants(commandBuffers[currentFrame], 
-                       skyPipelineLayout, 
-                       VK_SHADER_STAGE_FRAGMENT_BIT, 
-                       0, sizeof(SkyPushConstant), &push);
-
-    vkCmdDraw(commandBuffers[currentFrame], 4, 1, 0, 0);
-    
     update_camera_ubo();
 
     // 2. 3D Models
@@ -895,17 +668,13 @@ void cleanup_renderer()
     vkDeviceWaitIdle(device);
 
     cleanup_model_system();
+    sky_cleanup();
 
     vkDestroyBuffer(device, cameraUBOBuffer, NULL);
     vkFreeMemory(device, cameraUBOMemory, NULL);
 
     vkDestroyDescriptorSetLayout(device, modelDescriptorSetLayout, NULL);
     vkDestroyDescriptorPool(device, modelDescriptorPool, NULL);
-
-    vkDestroyPipeline(device, skyPipeline, NULL);
-    vkDestroyPipelineLayout(device, skyPipelineLayout, NULL);
-    vkDestroyShaderModule(device, vertShaderModule, NULL);
-    vkDestroyShaderModule(device, fragShaderModule, NULL);
 
     // your original cleanup code
     for (uint32_t i = 0; i < swapchainImageCount; i++) {

@@ -442,6 +442,15 @@ void create_ui_pipeline() {
     pipe.renderPass = renderPass;
     pipe.subpass = 0;
 
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable = VK_FALSE;
+	depthStencil.depthWriteEnable = VK_FALSE;
+	depthStencil.depthBoundsTestEnable = VK_FALSE;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
+	pipe.pDepthStencilState = &depthStencil;
+
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipe, NULL, &uiPipeline) != VK_SUCCESS) {
         printf("Failed to create UI pipeline\n");
         exit(1);

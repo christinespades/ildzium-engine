@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 :: === Configuration ===
 set BUILD_DIR=builds\debug
@@ -34,7 +34,11 @@ echo === Compiling Ildzium Engine ===
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 
-cl /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 main.c camera.c input.c memory.c model.c renderer.c shaders.c ui.c ui_renderer.c ^
+:: Collect all .c files in the current directory
+set "SRC_FILES="
+for %%f in (*.c) do set "SRC_FILES=!SRC_FILES! %%f"
+
+cl /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 %SRC_FILES% ^
     /Zi /W3 /MD /nologo ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^

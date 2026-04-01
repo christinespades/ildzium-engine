@@ -8,8 +8,7 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface);
 void cleanup_renderer(void);
 void draw_frame(void);
 
-// For models later
-void load_model(const char* glb_path);   // we'll implement this soon
+void load_model(const char* glb_path);
 extern VkDevice device;
 extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 extern VkPipeline modelPipeline;

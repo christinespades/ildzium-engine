@@ -119,5 +119,27 @@ This repository is proprietary software. Unauthorized copying, modification, red
 No license is granted except by explicit written permission from the author.
 
 ## TODO
+sky_set_time_of_day(0.5f);        // force noon
+g_skyParams.cycleSpeed = 0.0f;    // manual control only
+g_skyParams.nebulaIntensity = 0.9f;
+
+sun/moon disc, horizon glow, or more advanced scattering next
+
+move model renderer out of renderer
+variable skybox, button mappings, event system
+events.c to handle all buttons etc, button to change color of sky etc
+hold down button to cyle through faster and faster
+plan the menu system, input, levels
+levels.c
 A version of MVP that supports per-model translation/rotation/scale
-Or improvements to the fragment shader (e.g. better lighting or texture support)
+improvements to the fragment shader (better lighting, texture support)
+in editor represenation of models, buttons to load, gizmo to move etc
+better light model for model shader
+lights.c, ambient light color and value, directional light as well, plus point light system
+gizmos, move lights and models around, save menu, default map config, serialize
+textures
+collision
+landscape tool/ground/tile system
+make engine visible on website
+compile it to WebAssembly and run it in the browser
+integrate with GitHub Actions for auto-deploy
