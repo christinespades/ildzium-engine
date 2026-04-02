@@ -96,7 +96,7 @@ void setup_sky_tuners(void)
                  "Nebula Layers", &g_skyParams.nebulaLayerCount, 0.2f, 1.0f, 8.0f);
 
     ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
-                 "Star Count", &g_skyParams.starCount, 5.0f, 0.0f, 500.0f);
+                 "Star Count", &g_skyParams.starCount, 5.0f, 0.0f, 2500.0f);
 
     ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
                  "Star Brightness", &g_skyParams.starBrightness, 0.05f, 0.0f, 5.0f);
@@ -105,7 +105,7 @@ void setup_sky_tuners(void)
                  "Star Twinkle", &g_skyParams.starTwinkleSpeed, 0.5f, 0.0f, 20.0f);
 
     ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
-                 "Star Size", &g_skyParams.starSize, 0.01f, 0.01f, 0.5f);
+                 "Star Size", &g_skyParams.starSize, 0.01f, 0.001f, 0.3f);
 
     ui_add_tuner(&ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
                  "Time of Day", &g_skyParams.timeOfDay, 0.005f, 0.0f, 1.0f);

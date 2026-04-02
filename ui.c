@@ -1,6 +1,7 @@
 #include "ui.h"
 #include "events.h"
 #include "fonts.h"
+#include "settings.h"
 #include "sky.h"
 #include <string.h>
 #include <stdlib.h>
@@ -180,7 +181,7 @@ static void draw_char(uint32_t* fb, int fb_w, int fb_h, char c, int x, int y, ui
     }
 }
 
-static void draw_text(uint32_t* fb, int fb_w, int fb_h, const char* text, int x, int y, uint32_t color, int scale) {
+void draw_text(uint32_t* fb, int fb_w, int fb_h, const char* text, int x, int y, uint32_t color, int scale) {
     int cursor_x = x;
     while (*text) {
         draw_char(fb, fb_w, fb_h, *text++, cursor_x, y, color, scale);
@@ -236,5 +237,15 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height)
             draw_text(fb, fb_width, fb_height, val, 
                       b->x + 20, b->y + b->h - 32, 0xFFFFAA00, 2);
         }
+    }
+
+    // Draw FPS
+    if (g_renderer_flags & RENDERER_SHOW_FPS)
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "FPS: %.0f", g_fps);
+
+        draw_text(fb, fb_width, fb_height,
+                  buf, 10, 10, 0xFFFFFFFF, 2);
     }
 }

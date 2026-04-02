@@ -14,6 +14,7 @@
 GLFWwindow* g_window = NULL;
 VkInstance vk_instance = VK_NULL_HANDLE;
 VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
+static int g_target_fps = 60;
 
 // Forward declarations for renderer
 void init_renderer(VkInstance instance, VkSurfaceKHR surface);
@@ -48,6 +49,8 @@ int main()
     printf("Ildzium Engine started\n");
 
     double lastTime = glfwGetTime();
+    double last_render_time = glfwGetTime();
+    double frame_duration = 1.0 / (double)g_target_fps;
 
     while (!glfwWindowShouldClose(g_window))
     {
@@ -82,8 +85,13 @@ int main()
             // You can still poll left click here if you want camera actions
         }
         // ===========================================================
+        currentTime = glfwGetTime();
 
-        draw_frame();
+        if ((currentTime - last_render_time) >= frame_duration)
+        {
+            last_render_time = currentTime;
+            draw_frame();
+        }
     }
 
     cleanup_renderer();

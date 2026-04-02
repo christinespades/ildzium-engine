@@ -118,13 +118,29 @@ This repository is proprietary software. Unauthorized copying, modification, red
 
 No license is granted except by explicit written permission from the author.
 
-## TODO
+## Roadmap/TODO (very messy)
+find, fix memory leak/fps issue, more diagnostics and timestamps in general
+fix stars only appearing on half of skybox
 fix sky up/down thing, is passing aspect by UBO needed?
-adjust clamps of params
+adjust clamps of params, faster and more exponential acceleration when tuning params
 sun/moon disc, horizon glow, or more advanced scattering next
-move model renderer out of renderer
+Skybox and 3D model shader improvements (directional light,fog, consistent between everything
+textures for models
 
-variable skybox, button mappings, event system
+button mappings
+savable presets (e.g. for sky shader)
+tuner button to swap between sky shaders (e.g. one without nebula/aurora, one with volumetric fog etc)
+ui contexts for things
+UI tuners
+outline for selecting models, changing textures, transforms, gizmo
+
+Landscape tile
+Water shader
+Particle systems
+Universal skeleton, animations, deformation/morph targets/weights, per-bone collisions and soft body physics
+crowds.c, massive instancing/batch-processing/skeletal meshes
+ECS, AI perception and behavior
+
 events.c to handle all buttons etc, button to change color of sky etc
 hold down button to cycle through faster and faster
 plan the menu system, input, levels

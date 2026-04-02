@@ -4,11 +4,11 @@
 #include "cgltf.h"
 #include "model.h"
 #include "renderer.h" 
+#include "shaders.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Forward declarations from renderer.c
 extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 extern VkDevice device;                     // needed because renderer.h may not expose it directly
 extern VkPipeline modelPipeline;
@@ -16,6 +16,138 @@ extern VkPipelineLayout modelPipelineLayout;
 extern VkDescriptorSet modelDescriptorSet;
 extern void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
                                  VkBuffer* buffer, VkDeviceMemory* memory);
+extern VkRenderPass renderPass;
+extern VkShaderModule modelVertModule;
+extern VkShaderModule modelFragModule;
+extern VkDescriptorSetLayout modelDescriptorSetLayout;
+
+void create_model_pipeline(void)
+{
+    size_t vert_size, frag_size;
+    uint32_t* vert_code = load_spirv("../../shaders/model.vert.spv", &vert_size);
+    uint32_t* frag_code = load_spirv("../../shaders/model.frag.spv", &frag_size);
+    if (!vert_code || !frag_code) {
+        printf("Failed to load model shaders!\n");
+        exit(1);
+    }
+
+    VkShaderModuleCreateInfo sm = {0};
+    sm.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+
+    sm.codeSize = vert_size; sm.pCode = vert_code;
+    vkCreateShaderModule(device, &sm, NULL, &modelVertModule);
+    free(vert_code);
+
+    sm.codeSize = frag_size; sm.pCode = frag_code;
+    vkCreateShaderModule(device, &sm, NULL, &modelFragModule);
+    free(frag_code);
+
+    VkPipelineShaderStageCreateInfo stages[2] = {0};
+    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stages[0].module = modelVertModule;
+    stages[0].pName = "main";
+
+    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stages[1].module = modelFragModule;
+    stages[1].pName = "main";
+
+    // Vertex input
+    VkVertexInputBindingDescription binding = {0};
+    binding.binding = 0;
+    binding.stride = sizeof(Vertex3D);
+    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attrs[3] = {0};
+    attrs[0].location = 0; attrs[0].binding = 0; attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT; attrs[0].offset = offsetof(Vertex3D, x);
+    attrs[1].location = 1; attrs[1].binding = 0; attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT; attrs[1].offset = offsetof(Vertex3D, nx);
+    attrs[2].location = 2; attrs[2].binding = 0; attrs[2].format = VK_FORMAT_R32G32_SFLOAT;    attrs[2].offset = offsetof(Vertex3D, u);
+
+    VkPipelineVertexInputStateCreateInfo vertexInput = {0};
+    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInput.vertexBindingDescriptionCount = 1;
+    vertexInput.pVertexBindingDescriptions = &binding;
+    vertexInput.vertexAttributeDescriptionCount = 3;
+    vertexInput.pVertexAttributeDescriptions = attrs;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo viewportState = {0};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo raster = {0};
+    raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster.polygonMode = VK_POLYGON_MODE_FILL;
+    raster.lineWidth = 1.0f;
+    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    VkPipelineMultisampleStateCreateInfo ms = {0};
+    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {0};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState blendAttach = {0};
+    blendAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    VkPipelineColorBlendStateCreateInfo blend = {0};
+    blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blend.attachmentCount = 1;
+    blend.pAttachments = &blendAttach;
+
+    VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dyn = {0};
+    dyn.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dyn.dynamicStateCount = 2;
+    dyn.pDynamicStates = dynStates;
+
+    // === NEW: descriptor layout instead of push constant ===
+    VkPipelineLayoutCreateInfo layoutInfo = {0};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.setLayoutCount = 1;
+    layoutInfo.pSetLayouts = &modelDescriptorSetLayout;   // <-- this is the key change
+
+    if (vkCreatePipelineLayout(device, &layoutInfo, NULL, &modelPipelineLayout) != VK_SUCCESS) {
+        printf("Failed to create model pipeline layout\n");
+        exit(1);
+    }
+
+    VkGraphicsPipelineCreateInfo pipeInfo = {0};
+    pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeInfo.stageCount = 2;
+    pipeInfo.pStages = stages;
+    pipeInfo.pVertexInputState = &vertexInput;
+    pipeInfo.pInputAssemblyState = &inputAssembly;
+    pipeInfo.pViewportState = &viewportState;
+    pipeInfo.pRasterizationState = &raster;
+    pipeInfo.pMultisampleState = &ms;
+    pipeInfo.pDepthStencilState = &depthStencil;
+    pipeInfo.pColorBlendState = &blend;
+    pipeInfo.pDynamicState = &dyn;
+    pipeInfo.layout = modelPipelineLayout;
+    pipeInfo.renderPass = renderPass;
+    pipeInfo.subpass = 0;
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeInfo, NULL, &modelPipeline) != VK_SUCCESS) {
+        printf("Failed to create model pipeline\n");
+        exit(1);
+    }
+
+    printf("Model pipeline created successfully\n");
+}
 
 // Create / resize the instance storage buffer
 static void create_instance_buffer(uint32_t capacity)
@@ -39,6 +171,8 @@ static void create_instance_buffer(uint32_t capacity)
 
 void init_model_system(void)
 {
+    create_model_pipeline();
+
     g_model.instanceCapacity = 64;
     g_model.instances = malloc(g_model.instanceCapacity * sizeof(InstanceData));
     g_model.instanceCount = 0;
