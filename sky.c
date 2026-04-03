@@ -162,7 +162,7 @@ static void create_sky_descriptors(void)
     vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
 }
 
-static void create_sky_pipeline(void)
+void create_sky_pipeline(void)
 {
     size_t vert_size, frag_size;
     uint32_t* vert_code = load_spirv("../../shaders/sky.vert.spv", &vert_size);

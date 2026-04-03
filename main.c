@@ -9,6 +9,7 @@
 #include "main.h"
 #include "ui.h"
 #include "model.h"
+#include "watcher.h"
 
 // Globals
 GLFWwindow* g_window = NULL;
@@ -43,7 +44,7 @@ int main()
         float color[4] = {0.2f + (i%5)*0.2f, 0.6f, 0.8f, 1.0f};
         add_model_instance(transform, color);
     }
-
+    watcher_init();
     init_camera();
 
     printf("Ildzium Engine started\n");
@@ -55,6 +56,8 @@ int main()
     while (!glfwWindowShouldClose(g_window))
     {
         glfwPollEvents();
+        
+        watcher_update();
 
         double currentTime = glfwGetTime();
         float deltaTime = (float)(currentTime - lastTime);
@@ -94,6 +97,7 @@ int main()
         }
     }
 
+    watcher_cleanup();
     cleanup_renderer();
     vkDestroySurfaceKHR(vk_instance, vk_surface, NULL);
     vkDestroyInstance(vk_instance, NULL);

@@ -119,7 +119,10 @@ This repository is proprietary software. Unauthorized copying, modification, red
 No license is granted except by explicit written permission from the author.
 
 ## Roadmap/TODO (very messy)
-find, fix memory leak/fps issue, more diagnostics and timestamps in general
+shader hot reload
+fix tuners sensitivity
+replace stars with texture, animate brightness
+more diagnostics and timestamps in general
 fix stars only appearing on half of skybox
 fix sky up/down thing, is passing aspect by UBO needed?
 adjust clamps of params, faster and more exponential acceleration when tuning params
