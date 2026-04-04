@@ -24,7 +24,7 @@ Customization is limited to configuration of fixed, highly optimized data struct
 
 ## Rendering Philosophy
 
-Ildzium prioritizes computational and artistic complexity over geometric or scene complexity. This means physics simulations, particle systems, procedural animation, post-processing effects, AI behavior, world simulation, and weather systems. These systems define your project’s complexity rather than the sheer number of objects rendered; there will be a focus on the off-screen "life" in your games, and in-built systems to regulate workload by ensuring there can never be too much processing happening, too much drawn to the screen, etc.
+Ildzium prioritizes computational and artistic complexity over geometric or scene complexity. This means physics simulations, particle systems, procedural animation, post-processing effects, AI behavior, world simulation, and weather systems. These systems define your project’s complexity rather than the sheer number of objects rendered; there will be a focus on the off-screen "life" in your games.
 
 Rather than rendering large numbers of detailed objects (e.g., dense meshes, heavy lighting, decals), Ildzium focuses on:
 
@@ -98,9 +98,6 @@ This unified approach allows design decisions to evolve dynamically, ensuring th
 
 ## Design philosophy
 The engine enforces best practices for performance while remaining customizable, allowing developers to focus on gameplay and creative iteration without compromising efficiency.
-proprietary hyperoptimized Vulkan engine tailor-made for complex games with a unique aesthetic, where the complexity is not in the rendering of a million small particles, advanced lights, decals, meshes and clutter, but in the numeric/computational behavior of objects and the artistic/original/creative visual effects, postprocessing etc laid on top of very simple and performant structures... leveraging GPU wherever possible, cache optimization, rigid, enforced optimal structures and patterns, and minimizing any unnecesasry features. i design my conlang, compiler, engine and game in tandem and make adjustments along the way to achieve the desired result (my desire also evolves). for example, i might force the user to only have one giant optimized vertex buffer on the GPU, enforce the most optimal vulkan multi-draw indirect instanced thing or whatever, decide to not support any kind of expensive ray tracing or lights, 
-for the gpu and rendering side: custom ray tracing, compute shaders, QEM, LODs, drawing inspiration from all the advanced techniques, newest approaches in rendering etc, but always focus on simplicity, minimalism and lowpoly. texture and mesh pipelines, binary format, supercompression, 
-optimized data structures, circular buffers, bucket arrays, hash maps, this builds on the core ildz library and is the point where these overlap. 
 
 ## Planned expansions
 - Integration with the Ildz compiler, enabling transpilation from C to Ildz for a fully self-contained, high-performance development stack.
@@ -111,19 +108,10 @@ optimized data structures, circular buffers, bucket arrays, hash maps, this buil
   - Rewrite shaders to WGSL
   - Bridge C to browser: Emscripten for compilation and JS interop?
 
-## License & Usage
-Copyright © 2024-2026 Christine Spades. All rights reserved.
-
-This repository is proprietary software. Unauthorized copying, modification, redistribution, hosting, or commercial use is strictly prohibited.
-
-No license is granted except by explicit written permission from the author.
-
-## Roadmap/TODO (very messy)
-in model system when mesh ends with opt etc
-SKY
-camera 3d shader thing raymarch? reponse to cam movement
+## Roadmap/TODO (very messy; unreadable)
+camera 3d shader thing raymarch? reponse to movement, illusion of clouds
 sun/moon disc, horizon glow, or more advanced scattering
-(optimize skybox, star cubemaps, precomputed noise, etc
+optimize skybox, star cubemaps, precomputed noise, etc
 more diagnostics and timestamps in general, render graph stuff
 add settings for adjusting max range of sky params
 adjust clamps of params, faster and more exponential acceleration when tuning params
@@ -138,7 +126,7 @@ ui contexts for things
 UI tuners
 outline for selecting models, changing textures, transforms, gizmo
 
-Landscape tile
+Landscape tiles
 Water shader
 Particle systems
 Universal skeleton, animations, deformation/morph targets/weights, per-bone collisions and soft body physics
@@ -161,3 +149,10 @@ landscape tool/ground/tile system
 make engine visible on website
 compile it to WebAssembly and run it in the browser
 integrate with GitHub Actions for auto-deploy
+
+## License & Usage
+Copyright © 2024-2026 Christine Spades. All rights reserved.
+
+This repository is proprietary software. Unauthorized copying, modification, redistribution, hosting, or commercial use is strictly prohibited.
+
+No license is granted except by explicit written permission from the author.
