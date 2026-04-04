@@ -36,7 +36,7 @@ call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build
 
 :: Collect all .c files in the current directory
 set "SRC_FILES="
-for %%f in (*.c) do set "SRC_FILES=!SRC_FILES! %%f"
+for /R source %%f in (*.c) do set "SRC_FILES=!SRC_FILES! %%f"
 
 cl /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 /wd4244 %SRC_FILES% ^
     /Zi /W3 /MD /nologo ^

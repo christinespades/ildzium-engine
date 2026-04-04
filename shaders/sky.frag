@@ -1,35 +1,33 @@
 #version 450
+
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform SkyUBO {
     float time;
-    float yaw;
-    float pitch;
     float timeOfDay;
-    float dayNightBlend;        // 0 = night, 1 = day
-
+    float dayNightBlend;
     float nebulaSpeed;
     float nebulaScale;
     float nebulaIntensity;
     float nebulaLayerCount;
-
     float starCount;
     float starBrightness;
     float starTwinkleSpeed;
     float starSize;
-
     float auroraIntensity;
     float auroraSpeed;
-
-    vec4 nebulaColorNight; 
+    vec4 nebulaColorNight;
     vec4 nebulaColorDay;
     vec4 auroraColor;
-
     float vignetteStrength;
     float overallBrightness;
+    mat4 inverseView;   // ← New: from camera
 } ubo;
-// (hash33 and noise functions stay exactly the same)
+
+layout(set = 0, binding = 1) uniform samplerCube starCubemap;
+
+// === Noise functions (unchanged) ===
 vec3 hash33(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);
@@ -47,63 +45,69 @@ float noise(vec3 p) {
     return n;
 }
 
+// Simple fBM for nebula (better than simple layers)
+float fbm(vec3 p, int octaves) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    for (int i = 0; i < octaves; i++) {
+        value += amplitude * noise(p * frequency);
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+    return value;
+}
+
 void main() {
-    // 1. Correct Aspect Ratio (optional but prevents stretching)
-    // float aspect = 1920.0 / 1080.0; // Use actual resolution or pass via UBO
     vec2 uv = vUV * 2.0 - 1.0;
-    // uv.x *= aspect; 
 
-    // 2. Generate initial ray direction (Forward is Z+)
-    // Imagine a plane in front of the camera with a 90-degree FOV
-    vec3 rd = normalize(vec3(uv, 1.5)); 
+    vec3 rd = normalize(vec3(-uv, 1.6));                    // tweak 1.6 if FOV feels wrong
+    vec3 dir = (ubo.inverseView * vec4(rd, 0.0)).xyz;
+    dir = normalize(dir);
 
-    // 3. Rotate ray by Pitch (around X axis)
-    float cp = cos(ubo.pitch), sp = sin(ubo.pitch);
-    vec3 rayPitch = vec3(
-        rd.x,
-        rd.y * cp - rd.z * sp,
-        rd.y * sp + rd.z * cp
-    );
-
-    // 4. Rotate ray by Yaw (around Y axis)
-    float cy = cos(ubo.yaw), sy = sin(ubo.yaw);
-    vec3 dir = vec3(
-        rayPitch.x * cy + rayPitch.z * sy,
-        rayPitch.y,
-        -rayPitch.x * sy + rayPitch.z * cy
-    );
-
-    // Use 'dir' for all your noise and star calculations
-    float t = ubo.time;
+    float t = ubo.time * ubo.nebulaSpeed;
     vec3 col = vec3(0.0);
 
-    // Nebula - using .rgb since we switched to vec4
+    // === Nebula with fBM (much smoother, fewer sharp lines) ===
     vec3 nebulaColor = mix(ubo.nebulaColorNight.rgb, ubo.nebulaColorDay.rgb, ubo.dayNightBlend);
-    for (float i = 0.0; i < ubo.nebulaLayerCount; i++) {
-        vec3 p = dir * (2.2 + i * 0.9) + vec3(t * 0.02, t * 0.01, t * 0.03);
-        float n = noise(p * ubo.nebulaScale);
-        n = pow(n, 2.1) * 0.75;
-        col += nebulaColor.rgb * n * ubo.nebulaIntensity * (0.6 + 0.4 * ubo.dayNightBlend);
+
+    for (float layer = 0.0; layer < ubo.nebulaLayerCount; layer++) {
+        vec3 offset = hash33(vec3(layer * 122.3, layer * 82.7, layer * 17.1)) * 10.0;
+        vec3 p = dir * ubo.nebulaScale * (1.8 + layer * 0.6) + offset + t * vec3(0.01, 0.008, 0.015);
+
+        float n = fbm(p, 6);
+        n = pow(n * 1.1, 2.6) * 0.085;           // contrast
+
+        col += nebulaColor * n * ubo.nebulaIntensity * (0.65 + 0.35 * ubo.dayNightBlend);
     }
 
-    // Stars (stronger at night)
+    // === Best round stars version ===
     vec3 stars = vec3(0.0);
-    for (float i = 0.0; i < ubo.starCount; i++) {
-        vec3 h = hash33(vec3(i, i*1.6, i*2.8));
-        vec3 pos = normalize(h * 2.0 - 1.0);
-        float brightness = pow(h.z, 32.0) * (0.7 + 0.3 * sin(t * ubo.starTwinkleSpeed + i));
-        float dist = length(dir - pos);
-        stars += brightness * (1.0 - smoothstep(0.0, ubo.starSize, dist));
-    }
-    col += stars * ubo.starBrightness * (1.0 - ubo.dayNightBlend * 0.7);  // dim during day
 
-    // Aurora (only at night)
-    float aurora = sin(dir.y * 7.0 + t * ubo.auroraSpeed) * 0.5 + 0.5;
+    for (float i = 0.0; i < min(ubo.starCount, 1000.0); i++) {
+        vec3 h = hash33(vec3(i, i*1.6180339887, i*2.718281828));
+
+        vec3 starPos = normalize(h * 2.0 - 1.0);
+
+        float d = max(dot(dir, starPos), 0.0);
+        float brightness = pow(h.z, 30.0) * ubo.starBrightness;
+
+        brightness *= 0.8 + 0.2 * sin(t * ubo.starTwinkleSpeed * (1.0 + h.x*8.0) + i);
+
+        // Very round and sharp star shape
+        float star = pow(d, 1.0 / (ubo.starSize * 0.015 + 0.0005));
+
+        stars += brightness * star;
+    }
+
+    col += stars * (1.0 - ubo.dayNightBlend * 0.6);
+
+    // === Aurora ===
+    float aurora = pow(max(sin(dir.y * 8.0 + t * ubo.auroraSpeed) * 0.5 + 0.5, 0.0), 2.3);
     col += ubo.auroraColor.rgb * aurora * ubo.auroraIntensity * (1.0 - ubo.dayNightBlend);
 
-    // Vignette
-    col *= 1.0 - length(uv) * ubo.vignetteStrength;
-
+    // === Final ===
+    col *= 1.0 - length(uv) * ubo.vignetteStrength * 0.8;
     col *= ubo.overallBrightness;
 
     outColor = vec4(col, 1.0);

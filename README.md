@@ -119,14 +119,14 @@ This repository is proprietary software. Unauthorized copying, modification, red
 No license is granted except by explicit written permission from the author.
 
 ## Roadmap/TODO (very messy)
-shader hot reload
-fix tuners sensitivity
-replace stars with texture, animate brightness
-more diagnostics and timestamps in general
-fix stars only appearing on half of skybox
-fix sky up/down thing, is passing aspect by UBO needed?
+SKY
+camera 3d shader thing raymarch? reponse to cam movement
+sun/moon disc, horizon glow, or more advanced scattering
+(optimize skybox, star cubemaps, precomputed noise, etc
+more diagnostics and timestamps in general, render graph stuff
+add settings for adjusting max range of sky params
 adjust clamps of params, faster and more exponential acceleration when tuning params
-sun/moon disc, horizon glow, or more advanced scattering next
+
 Skybox and 3D model shader improvements (directional light,fog, consistent between everything
 textures for models
 
