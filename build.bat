@@ -14,6 +14,8 @@ set "GLSLC=%VULKAN_SDK%\Bin\glslc.exe"
 set THIRDPARTY_INCLUDE=thirdparty
 set GLFW_LIB=thirdparty\GLFW\glfw3dll.lib
 set GLFW_DLL=thirdparty\GLFW\glfw3.dll
+set CURL_LIB=thirdparty\curl\libcurl.lib
+set CURL_DLL=thirdparty\curl\libcurl-x64.dll
 
 :: Create build directory
 if not exist %BUILD_DIR% mkdir %BUILD_DIR%
@@ -40,6 +42,7 @@ for /R source %%f in (*.c) do set "SRC_FILES=!SRC_FILES! %%f"
 
 cl /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 /wd4244 %SRC_FILES% ^
     /Zi /W3 /MD /nologo ^
+    /I"source" ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^
     /Fe"%BUILD_DIR%\%OUT_EXE%" ^
@@ -49,7 +52,7 @@ cl /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 /wd4244 %SRC_FILES% ^
     /DEBUG ^
     /LIBPATH:"%VULKAN_LIB%" ^
     vulkan-1.lib ^
-    "%GLFW_LIB%" ^
+    "%GLFW_LIB%" "%CURL_LIB%" ^
     user32.lib shell32.lib
 
 if errorlevel 1 (
@@ -70,6 +73,12 @@ if exist "%BUILD_DIR%\%OUT_EXE%" (
     ) else (
         echo WARNING: glfw3.dll not found at %GLFW_DLL%
         echo You may need to copy it manually or adjust the path.
+    )
+
+    if exist "%CURL_DLL%" (
+        copy /Y "%CURL_DLL%" "%BUILD_DIR%\"
+    ) else (
+        echo WARNING: libcurl-x64.dll not found at %CURL_DLL%
     )
 
     echo.

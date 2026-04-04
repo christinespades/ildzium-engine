@@ -17,7 +17,7 @@ layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 proj;
 } camera;
 
-layout(set = 0, binding = 1) readonly buffer InstanceSSBO {
+layout(set = 0, binding = 1, std140) readonly buffer InstanceSSBO {
     InstanceData instances[];
 } instanceData;
 

@@ -119,6 +119,7 @@ This repository is proprietary software. Unauthorized copying, modification, red
 No license is granted except by explicit written permission from the author.
 
 ## Roadmap/TODO (very messy)
+in model system when mesh ends with opt etc
 SKY
 camera 3d shader thing raymarch? reponse to cam movement
 sun/moon disc, horizon glow, or more advanced scattering
