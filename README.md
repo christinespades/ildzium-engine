@@ -96,10 +96,10 @@ This unified approach allows design decisions to evolve dynamically, ensuring th
 
 >I initially implemented DLL swapping in C/C++, supporting renderer and shader hot-reload. The full core engine hot-reload was cumbersome, motivating the creation of a custom language and compiler. Current strategy involves invoking the Ildz compiler and applying runtime techniques to update subsystems as seamlessly as possible. Final implementation details are pending.
 
-## Design philosophy
+## Design Philosophy
 The engine enforces best practices for performance while remaining customizable, allowing developers to focus on gameplay and creative iteration without compromising efficiency.
 
-## Planned expansions
+## Planned Expansions
 - Integration with the Ildz compiler, enabling transpilation from C to Ildz for a fully self-contained, high-performance development stack.
 - In/engine visual node representation of files (.ildz, .glsl, .py, etc.) for even faster hot-reload iteration (no need for an external code editor)
 - Backend for WebGPU/WebAssembly:
@@ -107,48 +107,6 @@ The engine enforces best practices for performance while remaining customizable,
   - Second renderer targeting WebGPU concepts
   - Rewrite shaders to WGSL
   - Bridge C to browser: Emscripten for compilation and JS interop?
-
-## Roadmap/TODO (very messy; unreadable)
-camera 3d shader thing raymarch? reponse to movement, illusion of clouds
-sun/moon disc, horizon glow, or more advanced scattering
-optimize skybox, star cubemaps, precomputed noise, etc
-more diagnostics and timestamps in general, render graph stuff
-add settings for adjusting max range of sky params
-adjust clamps of params, faster and more exponential acceleration when tuning params
-
-Skybox and 3D model shader improvements (directional light,fog, consistent between everything
-textures for models
-
-button mappings
-savable presets (e.g. for sky shader)
-tuner button to swap between sky shaders (e.g. one without nebula/aurora, one with volumetric fog etc)
-ui contexts for things
-UI tuners
-outline for selecting models, changing textures, transforms, gizmo
-
-Landscape tiles
-Water shader
-Particle systems
-Universal skeleton, animations, deformation/morph targets/weights, per-bone collisions and soft body physics
-crowds.c, massive instancing/batch-processing/skeletal meshes
-ECS, AI perception and behavior
-
-events.c to handle all buttons etc, button to change color of sky etc
-hold down button to cycle through faster and faster
-plan the menu system, input, levels
-levels.c
-A version of MVP that supports per-model translation/rotation/scale
-improvements to the fragment shader (better lighting, texture support)
-in editor represenation of models, buttons to load, gizmo to move etc
-better light model for model shader
-lights.c, ambient light color and value, directional light as well, plus point light system
-gizmos, move lights and models around, save menu, default map config, serialize
-textures
-collision
-landscape tool/ground/tile system
-make engine visible on website
-compile it to WebAssembly and run it in the browser
-integrate with GitHub Actions for auto-deploy
 
 ## License & Usage
 Copyright © 2024-2026 Christine Spades. All rights reserved.
