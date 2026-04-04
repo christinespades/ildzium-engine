@@ -17,7 +17,7 @@ extern void setup_terrain_controls(UI_Context* ctx);
 
 static void add_top_navigation_buttons(UI_Context* ctx) {
     const int top_y = 5;
-    const int btn_w = 130;
+    const int btn_w = 200;
     const int spacing = 8;
     int x = 10;
 
@@ -44,21 +44,19 @@ void ui_set_mode(UI_Context* ctx, UI_Mode mode) {
     ctx->button_count = 0;
     memset(ctx->button_held_last_frame, 0, MAX_BUTTONS * sizeof(uint8_t));
 
-    // 1. Re-add the top navigation (always first)
     add_top_navigation_buttons(ctx);
 
-    // 2. Add the context-specific controls below the top bar
     switch (mode) {
         case UI_MODE_MAIN_MENU:
-            setup_main_menu_controls(ctx);   // you will write this
+            setup_main_menu_controls(ctx);
             break;
 
         case UI_MODE_SKYBOX:
-            setup_skybox_controls(ctx);      // renamed from your old setup_sky_tuners
+            setup_skybox_controls(ctx);
             break;
 
         case UI_MODE_TERRAIN:
-            setup_terrain_controls(ctx);     // you will write this
+            setup_terrain_controls(ctx);
             break;
 
         default:
@@ -152,7 +150,7 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, flo
             b->hold_time += dt;  // accumulate seconds held
 
             // Quadratic acceleration: starts very small, gets faster the longer you hold
-            float speed = 0.1f + b->hold_time * b->hold_time * 3.0f;  // adjust 3.0f for faster/farther
+            float speed = 0.1f + b->hold_time * b->hold_time * 9.0f;  // adjust 3.0f for faster/farther
 
             float range = b->max_value - b->min_value;
             

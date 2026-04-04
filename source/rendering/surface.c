@@ -1,8 +1,10 @@
-#include "rendering/surface.h"
+#include "surface.h"
 #include <stdio.h>    // FILE, fopen, fread, fseek, ftell, fclose, printf
 #include <stdlib.h>   // malloc, free, exit, NULL
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include "input/input.h"
 
 GLFWwindow* g_window = NULL;
@@ -42,6 +44,22 @@ void init_glfw(void)
         printf("Failed to create GLFW window\n");
         glfwTerminate();
         exit(1);
+    }
+
+    // Add icon
+    int width, height, channels;
+    unsigned char* pixels = stbi_load("../../icons/main.png", &width, &height, &channels, 4);
+
+    if (pixels) {
+        GLFWimage icon;
+        icon.width = width;
+        icon.height = height;
+        icon.pixels = pixels;
+
+        glfwSetWindowIcon(g_window, 1, &icon);
+        stbi_image_free(pixels);
+    } else {
+        printf("Failed to load icon\n");
     }
 
     // Center the window

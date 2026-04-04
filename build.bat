@@ -40,11 +40,18 @@ call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build
 set "SRC_FILES="
 for /R source %%f in (*.c) do set "SRC_FILES=!SRC_FILES! %%f"
 
+rc /fo "%BUILD_DIR%\resource.res" resource.rc
+if errorlevel 1 (
+    echo Resource compilation FAILED!
+    pause
+    exit /b
+)
 cl /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 /wd4244 %SRC_FILES% ^
     /Zi /W3 /MD /nologo ^
     /I"source" ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^
+    "%BUILD_DIR%\resource.res" ^
     /Fe"%BUILD_DIR%\%OUT_EXE%" ^
     /Fo"%BUILD_DIR%\\" ^
     /Fd"%BUILD_DIR%\\" ^

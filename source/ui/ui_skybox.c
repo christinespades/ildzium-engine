@@ -4,10 +4,10 @@
 void setup_skybox_controls(UI_Context* ctx)
 {
     float btn_w = 380;
-    float btn_h = 70;        // slightly taller so value fits nicely
-    float start_x = 250;
-    float start_y = 100;
-    float spacing = 80;      // increased a bit for better readability
+    float btn_h = 70;
+    float start_x = 50;
+    float start_y = 50;
+    float spacing = btn_h;
     int idx = 0;
 
     ui_add_tuner(g_ui_ctx, start_x + 400, start_y + 4 * spacing, btn_w, btn_h,

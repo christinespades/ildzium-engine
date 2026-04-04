@@ -105,6 +105,7 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height)
             int scale_y = (b->h - 2*padding) / (num_lines * char_h);
             int scale = scale_x < scale_y ? scale_x : scale_y;
             if (scale < 1) scale = 1;
+            if (scale > 2) scale = 2;
 
             // Draw each line centered
             int cursor_y = b->y + padding;
