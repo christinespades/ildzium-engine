@@ -30,7 +30,6 @@ int main()
     g_ui_ctx = malloc(sizeof(UI_Context));
     ui_init(g_ui_ctx);
     init_renderer(vk_instance, vk_surface);
-    init_model_system();
     watcher_init();
     init_camera();
 

@@ -2,7 +2,9 @@
 #define CGLTF_MESHOPT_DECODE 1
 #define MESHOPTIMIZER_IMPLEMENTATION
 #include "cgltf.h"
+#include "scene/lights.h"
 #include "scene/model.h"
+#include "core/math.h"
 #include "rendering/renderer.h" 
 #include "rendering/shaders.h"
 #include <stdio.h>
@@ -122,17 +124,6 @@ void create_model_pipeline(void)
     dyn.dynamicStateCount = 2;
     dyn.pDynamicStates = dynStates;
 
-    // === NEW: descriptor layout instead of push constant ===
-    VkPipelineLayoutCreateInfo layoutInfo = {0};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts = &modelDescriptorSetLayout;   // <-- this is the key change
-
-    if (vkCreatePipelineLayout(device, &layoutInfo, NULL, &modelPipelineLayout) != VK_SUCCESS) {
-        printf("Failed to create model pipeline layout\n");
-        exit(1);
-    }
-
     VkGraphicsPipelineCreateInfo pipeInfo = {0};
     pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeInfo.stageCount = 2;
@@ -193,29 +184,56 @@ void create_model_descriptors(void)
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
-    layoutInfo.pBindings = bindings;
-    vkCreateDescriptorSetLayout(device, &layoutInfo, NULL, &modelDescriptorSetLayout);
+    // --- Descriptor set layout ---
+    VkDescriptorSetLayoutCreateInfo setLayoutInfo = {0};
+    setLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    setLayoutInfo.bindingCount = 2;
+    setLayoutInfo.pBindings = bindings;
+
+    vkCreateDescriptorSetLayout(device, &setLayoutInfo, NULL, &modelDescriptorSetLayout);
+
+    // --- Pipeline layout ---
+    VkDescriptorSetLayout setLayouts[2] = {
+        lightDescriptorSetLayout,
+        modelDescriptorSetLayout
+    };
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 2;
+    pipelineLayoutInfo.pSetLayouts = setLayouts;
+
+    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &modelPipelineLayout) != VK_SUCCESS) {
+        printf("Failed to create model pipeline layout\n");
+        exit(1);
+    }
 
     VkDescriptorPoolSize poolSizes[2] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2},  // camera + lights
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}
     };
     VkDescriptorPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = 1;
+    poolInfo.maxSets = 2;
     vkCreateDescriptorPool(device, &poolInfo, NULL, &modelDescriptorPool);
 
     VkDescriptorSetAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = modelDescriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &modelDescriptorSetLayout;
-    vkAllocateDescriptorSets(device, &allocInfo, &modelDescriptorSet);
+    allocInfo.descriptorSetCount = 2;
+    allocInfo.pSetLayouts = setLayouts;
+
+    VkDescriptorSet sets[2];
+
+    if (vkAllocateDescriptorSets(device, &allocInfo, sets) != VK_SUCCESS) {
+        printf("FAILED TO ALLOCATE DESCRIPTOR SETS\n");
+        exit(1);
+    }
+
+    g_lights.descriptorSet = sets[0];
+    modelDescriptorSet = sets[1];
 
     // Initial camera UBO write
     VkDescriptorBufferInfo camInfo = { cameraUBOBuffer, 0, sizeof(CameraUBO) };
@@ -246,12 +264,16 @@ void update_model_descriptor(void)
     write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     write.descriptorCount = 1;
     write.pBufferInfo = &instInfo;
-
+    if (modelDescriptorSet == VK_NULL_HANDLE) {
+        printf("MODEL DESCRIPTOR IS NULL\n");
+        exit(1);
+    }
     vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
 }
 
 void init_model_system(void)
 {
+    create_model_descriptors();
     create_model_pipeline();
 
     g_model_system.models = NULL;
@@ -273,9 +295,12 @@ void init_model_system(void)
     for (int i = 0; i < 200; i++) {
         float transform[16] = {0}; // fill with your TRS matrix
         matrix_identity(transform);
-        transform[12] = (float)(i % 20) * 2.0f - 20.0f;
-        transform[13] = 0.0f;
-        transform[14] = (float)(i / 20) * 2.0f - 10.0f;
+
+        // matrix_scale(transform, 0.0075f, 0.075f, 0.075f);
+
+        transform[3]  = (float)(i % 5) * 14.0f - 28.0f;
+        transform[7]  = 0.0f;
+        transform[11] = (float)(i / 5) * 14.0f - 18.0f;
 
         float color[4] = {0.2f + (i%5)*0.2f, 0.6f, 0.8f, 1.0f};
         add_model_instance("../../meshes/cs_goddess_statue_opt.glb", transform, color);
@@ -455,7 +480,25 @@ void update_model_instances(void)
 
     void* data;
     vkMapMemory(device, g_model_system.instanceMemory, 0, needed, 0, &data);
-    memcpy(data, g_model_system.instances, needed);
+    
+    // Transpose each model matrix while copying (optimal place)
+    InstanceData* gpuData = (InstanceData*)data;
+    for (uint32_t i = 0; i < g_model_system.instanceCount; ++i) {
+        const InstanceData* cpuInst = &g_model_system.instances[i];
+
+        // Transpose model matrix (row-major → column-major for GLSL)
+        for (int col = 0; col < 4; ++col) {
+            for (int row = 0; row < 4; ++row) {
+                gpuData[i].model[col * 4 + row] = cpuInst->model[row * 4 + col];
+            }
+        }
+
+        // Copy color as-is
+        gpuData[i].color[0] = cpuInst->color[0];
+        gpuData[i].color[1] = cpuInst->color[1];
+        gpuData[i].color[2] = cpuInst->color[2];
+        gpuData[i].color[3] = cpuInst->color[3];
+    }
     vkUnmapMemory(device, g_model_system.instanceMemory);
 }
 
@@ -465,10 +508,14 @@ void draw_models(VkCommandBuffer cmd)
 
     update_model_instances();
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            modelPipelineLayout, 0, 1, &modelDescriptorSet, 0, NULL);
-
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline);
+
+    VkDescriptorSet sets[2] = { g_lights.descriptorSet, modelDescriptorSet };
+
+    // --- Bind descriptor (set 0, binding 0) ---
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            modelPipelineLayout,
+                            0, 2, sets, 0, NULL);
 
     // For now we only support ONE model (the first one). We'll improve this soon.
     Model* m = &g_model_system.models[0];

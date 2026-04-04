@@ -9,9 +9,10 @@
 #include "ui/ui_renderer.h"
 #include "core/math.h"
 #include "core/memory.h"
-#include "scene/model.h"
 #include "rendering/renderer_draw.h"
 #include "rendering/shaders.h"
+#include "scene/lights.h"
+#include "scene/model.h"
 #include "scene/sky.h"
 
 extern CameraUBO cameraUBOData;
@@ -303,12 +304,12 @@ void init_renderer(VkInstance instance, VkSurfaceKHR surface)
     }
 
     create_camera_ubo();
-    create_model_descriptors();
     sky_init();
     ui_renderer_init();
 
+    init_lights(device, physicalDevice);
     init_model_system();
-    update_model_descriptor();         // initial empty buffer
+    init_lights_write(device);
     printf("Renderer initialized\n");
 }
 
@@ -326,7 +327,6 @@ void cleanup_renderer()
     vkDestroyDescriptorSetLayout(device, modelDescriptorSetLayout, NULL);
     vkDestroyDescriptorPool(device, modelDescriptorPool, NULL);
 
-    // your original cleanup code
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
         vkDestroyFramebuffer(device, framebuffers[i], NULL);
         vkDestroyImageView(device, swapchainImageViews[i], NULL);

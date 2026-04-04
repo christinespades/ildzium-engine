@@ -1,9 +1,10 @@
+#include <math.h>
+#include <string.h>
+
 #include "scene/camera.h"
 #include "core/math.h"
 #include "rendering/renderer.h"
 #include "ui/ui.h"
-#include <math.h>
-#include <string.h>
 
 Camera camera = {0.0f, 0.0f, 5.0f, -90.0f, 0.0f, 15.0f};
 

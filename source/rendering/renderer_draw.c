@@ -1,9 +1,10 @@
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
-#include "scene/camera.h"
 #include "rendering/device.h"
-#include "scene/model.h"
 #include "rendering/renderer_draw.h"
+#include "scene/camera.h"
+#include "scene/lights.h"
+#include "scene/model.h"
 #include "scene/sky.h"
 #include "ui/ui.h"
 #include "ui/ui_renderer.h"
@@ -77,11 +78,16 @@ void draw_frame()
     sky_draw(commandBuffers[currentFrame]);
 
     update_camera_ubo();
+    lights_update(commandBuffers[currentFrame],
+                  modelPipelineLayout, //binding 0 is lights UBO, 1 is camera + instance UBO
+                  0.15f, 0.15f, 0.15f,
+                  1.0f, 1.0f, -1.0f,
+                  1.0f,
+                  4,
+                  camera.x, camera.y, camera.z);
 
     // 2. 3D Models
     if (g_model_system.modelCount > 0) {
-        vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline);
-
         draw_models(commandBuffers[currentFrame]);
     }
 

@@ -67,3 +67,20 @@ bool matrix_inverse(const float m[16], float invOut[16])
 
     return true;
 }
+
+void matrix_identity(float m[16]);
+
+void matrix_scale(float m[16], float sx, float sy, float sz)
+{
+    m[0]  *= sx;  m[1]  *= sx;  m[2]  *= sx;  m[3]  *= sx;
+    m[4]  *= sy;  m[5]  *= sy;  m[6]  *= sy;  m[7]  *= sy;
+    m[8]  *= sz;  m[9]  *= sz;  m[10] *= sz;  m[11] *= sz;
+    // translation (elements 12,13,14) unchanged
+}
+
+// If you prefer a version that starts from identity:
+void matrix_make_scale(float m[16], float sx, float sy, float sz)
+{
+    matrix_identity(m);
+    matrix_scale(m, sx, sy, sz);
+}

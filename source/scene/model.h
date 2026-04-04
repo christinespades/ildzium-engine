@@ -19,7 +19,6 @@ typedef struct {
 typedef struct {
     float model[16];     // mat4 - 64 bytes
     float color[4];      // vec4 - 16 bytes
-    float padding[4];    // ← ADD THIS (makes struct 96 bytes, multiple of 16)
 } InstanceData;
 
 // One unique loaded model (can have 1 mesh for now)
