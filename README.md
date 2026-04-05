@@ -1,12 +1,13 @@
 # ildzium-engine
->The engine is not functional and I'm resurrecting it. I have various versions of it, some in C++, C and in Ildz.
-
 >“Toy engine” here means a personal project, not production-ready. Open sourcing or external contributions would only occur if a functional demo were achieved, likely years in the future.
 
-## Overview
+## Technical Overview
 Ildzium Engine is a Windows-based toy game engine built on the Vulkan API, designed for maximum performance and aesthetic control. It emphasizes rapid iteration through extensive hot-reloading capabilities across core subsystems, including engine architecture, rendering pipelines, and shader programs. It trades general-purpose flexibility for a tightly integrated, constraint-based design that prioritizes efficiency and creative expression through computation and post-processing rather than raw scene complexity.
 
 The engine targets both 2D and 3D game development, with a focus on highly efficient rendering workflows. It leverages modern Vulkan extensions to maximize GPU utilization, while maintaining a minimal and predictable runtime structure. Integrated systems include gameplay logic, animation, audio, and editor-driven material workflows. Shader compilation is automated, transforming GLSL into optimized SPIR-V binaries.
+
+## Functional Overview
+TODO: Describe features, show examples, the engine loop, processes, etc.
 
 ## Design Philosophy
 Ildzium Engine enforces performance-oriented best practices while remaining adaptable. The goal is to reduce developer overhead in low-level optimization decisions without removing control.
@@ -93,8 +94,6 @@ A defining feature of the engine is its iterative workflow:
 - Co-development of engine architecture, custom language (conlang), compiler/toolchain, and game logic. 
 
 This unified approach allows design decisions to evolve dynamically, ensuring that the engine remains aligned with the specific needs of the project. Developers write in the Ildz language within the engine UI. Code transpiles to GLSL, SPIR-V, or other targets. Hotkeys trigger compilation and hot-reloading, enabling immediate iteration on gameplay or shaders without external editors.
-
->I initially implemented DLL swapping in C/C++, supporting renderer and shader hot-reload. The full core engine hot-reload was cumbersome, motivating the creation of a custom language and compiler. Current strategy involves invoking the Ildz compiler and applying runtime techniques to update subsystems as seamlessly as possible. Final implementation details are pending.
 
 ## Design Philosophy
 The engine enforces best practices for performance while remaining customizable, allowing developers to focus on gameplay and creative iteration without compromising efficiency.
