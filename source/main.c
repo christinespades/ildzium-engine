@@ -27,6 +27,7 @@ extern VkSurfaceKHR vk_surface;
 int main()
 {
     surface_init();
+    init_input();
     g_ui_ctx = malloc(sizeof(UI_Context));
     ui_init(g_ui_ctx);
     init_renderer(vk_instance, vk_surface);
@@ -64,7 +65,8 @@ int main()
             if (mx >= win_w) mx = win_w - 1;
             if (my >= win_h) my = win_h - 1;
 
-            ui_update(g_ui_ctx, (int)mx, (int)my, left_pressed, deltaTime);
+            ui_update(g_ui_ctx, (int)mx, (int)my, left_pressed, mouse_wheel, deltaTime);
+            mouse_wheel = 0.0;  // reset each frame after consuming
         }
         else {
             // Game mode - mouse movement already handled in callback

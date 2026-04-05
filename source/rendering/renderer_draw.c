@@ -7,6 +7,7 @@
 #include "scene/model.h"
 #include "scene/sky.h"
 #include "ui/ui.h"
+#include "ui/ui_draw.h"
 #include "ui/ui_renderer.h"
 
 float g_fps = 0.0f;
@@ -92,7 +93,7 @@ void draw_frame()
     }
 
     if (g_ui_ctx->cursor_captured) {
-        ui_draw(g_ui_ctx, ui_framebuffer, swapchainExtent.width, swapchainExtent.height);
+        ui_draw(g_ui_ctx, ui_framebuffer, swapchainExtent.width, swapchainExtent.height, dt);
         ui_renderer_upload(ui_framebuffer, swapchainExtent.width, swapchainExtent.height);
         ui_renderer_draw(commandBuffers[currentFrame]);
     }

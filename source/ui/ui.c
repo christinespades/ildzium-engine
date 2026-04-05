@@ -1,4 +1,5 @@
 #include "ui/ui.h"
+#include <GLFW/glfw3.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,13 +8,15 @@
 #include "core/settings.h"
 #include "scene/sky.h"
 #include "ui_callbacks.h"
-#include "ui/ui_skybox.h"
-
-#define MAX_BUTTONS 64
+#include "ui/ui_editor.h"
+#include "ui/ui_elements.h"
+#include "ui/modes/ui_skybox.h"
 
 static float hold_accumulator = 0.0f;
 extern void setup_main_menu_controls(UI_Context* ctx);
 extern void setup_terrain_controls(UI_Context* ctx);
+
+float mouse_wheel_sensitivity = 40.0f;
 
 static void add_top_navigation_buttons(UI_Context* ctx) {
     const int top_y = 5;
@@ -84,73 +87,62 @@ void ui_cleanup(UI_Context* ctx) {
     ctx->button_count = 0;
 }
 
-void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text,
-                   UI_ButtonCallback on_click,
-                   UI_ButtonCallback on_held,
-                   UI_ButtonCallback on_release) {
-    if (ctx->button_count >= MAX_BUTTONS) return;
-
-    UI_Button* b = &ctx->buttons[ctx->button_count];
-    b->x = x; b->y = y; b->w = w; b->h = h;
-    b->text = text;
-    b->on_click = on_click;
-    b->on_held = on_held;
-    b->on_release = on_release;
-
-    // Default: no tuning
-    b->target_value = NULL;
-    b->step_size = 0.0f;
-    b->min_value = 0.0f;
-    b->max_value = 0.0f;
-
-    ctx->button_count++;
-}
-
-void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
-                  const char* text,
-                  float* target,
-                  float min_val,
-                  float max_val)
-{
-    if (ctx->button_count >= MAX_BUTTONS) return;
-
-    UI_Button* b = &ctx->buttons[ctx->button_count];
-    
-    b->x = x; b->y = y; b->w = w; b->h = h;
-    b->text = text;
-    b->on_click = NULL;
-    b->on_held = NULL;
-    b->on_release = NULL;
-    b->target_value = target;
-    b->min_value = min_val;
-    b->max_value = max_val;
-    // auto-compute (recommended)
-    b->step_size = 0.0f;   // mark as "auto"
-    
-    ctx->button_count++;
-}
-
-void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, float dt)
+void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt)
 {
     if (!ctx->cursor_captured) return;
 
+    static double last_click_time = 0.0;
+    static int last_click_button_index = -1;
+    double current_time = glfwGetTime();
+
     for (int i = 0; i < ctx->button_count; i++) {
         UI_Button* b = &ctx->buttons[i];
-        uint8_t* was_held = &ctx->button_held_last_frame[i];
-
         int is_hover = (mouse_x >= b->x && mouse_x < b->x + b->w &&
                         mouse_y >= b->y && mouse_y < b->y + b->h);
 
+        // Scroll handling (works for both editors and scrollable panels)
+        if (b->is_scrollable && is_hover && mouse_wheel != 0) {
+            b->scroll_offset -= mouse_wheel * 25.0f;   // adjust sensitivity
+        }
+
         int is_pressed = mouse_pressed && is_hover;
+
+        // ==================== EDITOR MOUSE HANDLING ====================
+        if (b->is_editable && is_hover) {
+
+            // Left click - set cursor / start selection
+            if (is_pressed) {
+                int new_cursor = get_char_index_from_mouse(b, mouse_x, mouse_y);
+
+                // Double-click detection
+                if (current_time - last_click_time < 0.35 && last_click_button_index == i) {
+                    // Double click → select word
+                    select_word_at_position(b, new_cursor);
+                } else {
+                    // Single click
+                    b->cursor_pos = new_cursor;
+                    b->selection_start = b->selection_end = new_cursor;   // start new selection
+                }
+
+                last_click_time = current_time;
+                last_click_button_index = i;
+            }
+            // Mouse drag → update selection end
+            else if (ctx->button_held_last_frame[i] && mouse_pressed) {
+                int new_pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
+                b->selection_end = new_pos;
+                b->cursor_pos = new_pos;   // cursor follows mouse during drag
+            }
+        }
 
         // === TUNING LOGIC (while held) ===
         if (is_pressed && b->target_value != NULL) {
-            if (!*was_held) b->hold_time = 0.0f;  // reset per button on new press
+            if (!ctx->button_held_last_frame[i]) b->hold_time = 0.0f;  // reset per button on new press
 
             b->hold_time += dt;  // accumulate seconds held
 
             // Quadratic acceleration: starts very small, gets faster the longer you hold
-            float speed = 0.1f + b->hold_time * b->hold_time * 9.0f;  // adjust 3.0f for faster/farther
+            float speed = 0.1f + b->hold_time * b->hold_time * 9.0f;  // adjust 9.0f for faster/farther
 
             float range = b->max_value - b->min_value;
             
@@ -182,15 +174,13 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, flo
         if (is_pressed) {
             if (b->on_held) b->on_held();
         }
-
-        if (is_pressed && !(*was_held)) {
+        if (is_pressed && !ctx->button_held_last_frame[i]) {
             if (b->on_click) b->on_click();
         }
-
-        if (!is_pressed && *was_held) {
+        if (!is_pressed && ctx->button_held_last_frame[i]) {
             if (b->on_release) b->on_release();
         }
 
-        *was_held = is_pressed;
+        ctx->button_held_last_frame[i] = is_pressed;
     }
 }

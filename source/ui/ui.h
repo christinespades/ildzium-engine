@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct UI_Button {
     int x, y;           // top-left position
@@ -14,6 +15,20 @@ typedef struct UI_Button {
     float  min_value;
     float  max_value;
     float hold_time; 
+    bool is_scrollable;
+    bool is_editable;           // new
+    char* content;              // owned buffer (dynamically allocated)
+    size_t content_capacity;
+    int cursor_pos;             // character index
+    int selection_start;        // -1 = no selection
+    int selection_end;
+    float scroll_offset;        // vertical scroll (pixels)
+    float content_height;       // total height needed for text
+    int line_height;            // approx pixels per line (set during draw)
+
+    double last_click_time;     // use glfwGetTime()
+    int last_click_x, last_click_y;
+    char* filepath;
 } UI_Button;
 
 typedef enum {
@@ -29,7 +44,9 @@ typedef struct UI_Context {
     int button_count;
     int cursor_captured;
     uint8_t* button_held_last_frame;
-    UI_Mode current_mode;   // <--- add this
+    UI_Mode current_mode;
+    bool has_focused_editor;        // to know if we should route text input
+    UI_Button* focused_button;      // or just check the one with is_editable
 } UI_Context;
 
 UI_Context* g_ui_ctx;   // global so callbacks can reach it
@@ -49,6 +66,5 @@ void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
                   float* target,
                   float min_val,
                   float max_val);
-void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, float dt);
-void ui_draw(UI_Context* ctx, uint32_t* framebuffer, int fb_width, int fb_height);
+void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt);
 void ui_set_mode(UI_Context* ctx, UI_Mode mode);

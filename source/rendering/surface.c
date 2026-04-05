@@ -66,11 +66,6 @@ void init_glfw(void)
     int win_x = (screen_width - win_width) / 2;
     int win_y = (screen_height - win_height) / 2;
     glfwSetWindowPos(g_window, win_x, win_y);
-
-    glfwSetKeyCallback(g_window, key_callback);
-    glfwSetCursorPosCallback(g_window, mouse_callback);
-    glfwSetScrollCallback(g_window, scroll_callback);
-    glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 void create_vulkan_instance(void)
