@@ -17,7 +17,8 @@ typedef struct UI_Button {
     float hold_time; 
     bool is_scrollable;
     bool is_editable;           // new
-    char* content;              // owned buffer (dynamically allocated)
+    const char* content;   // read-only (buttons, labels)
+    char* editable_content; // mutable (text editor)
     size_t content_capacity;
     int cursor_pos;             // character index
     int selection_start;        // -1 = no selection
@@ -32,10 +33,15 @@ typedef struct UI_Button {
 } UI_Button;
 
 typedef enum {
-    UI_MODE_MAIN_MENU = 0,
+    UI_MODE_CAMERA = 0,
+    UI_MODE_FX,
+    UI_MODE_INPUT,
+    UI_MODE_LIGHTS,
+    UI_MODE_MAIN,
+    UI_MODE_MESHES,
     UI_MODE_SKYBOX,
+    UI_MODE_SOUNDS,
     UI_MODE_TERRAIN,
-    // add more later: UI_MODE_LIGHTS, UI_MODE_CAMERA, etc.
     UI_MODE_COUNT
 } UI_Mode;
 

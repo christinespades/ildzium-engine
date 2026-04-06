@@ -10,13 +10,37 @@
 #include "ui_callbacks.h"
 #include "ui/ui_editor.h"
 #include "ui/ui_elements.h"
-#include "ui/modes/ui_skybox.h"
+#include "ui/modes/ui_modes.h"
 
 static float hold_accumulator = 0.0f;
-extern void setup_main_menu_controls(UI_Context* ctx);
+extern void setup_camera_controls(UI_Context* ctx);
+extern void setup_fx_controls(UI_Context* ctx);
+extern void setup_input_controls(UI_Context* ctx);
+extern void setup_lights_controls(UI_Context* ctx);
+extern void setup_main_controls(UI_Context* ctx);
+extern void setup_meshes_controls(UI_Context* ctx);
+extern void setup_skybox_controls(UI_Context* ctx);
+extern void setup_sounds_controls(UI_Context* ctx);
 extern void setup_terrain_controls(UI_Context* ctx);
 
 float mouse_wheel_sensitivity = 40.0f;
+
+static void add_top_button(UI_Context *ctx,
+                           int *x,
+                           int top_y,
+                           int btn_w,
+                           int spacing,
+                           const char *label,
+                           UI_ButtonCallback on_click)
+{
+    ui_add_button(ctx, *x, top_y, btn_w, 50,
+                  label,
+                  on_click,
+                  on_button_held,
+                  NULL);
+
+    *x += btn_w + spacing;
+}
 
 static void add_top_navigation_buttons(UI_Context* ctx) {
     const int top_y = 5;
@@ -24,20 +48,15 @@ static void add_top_navigation_buttons(UI_Context* ctx) {
     const int spacing = 8;
     int x = 10;
 
-    // Always present in every context
-    ui_add_button(ctx, x, top_y, btn_w, 50, "MAIN MENU",
-                  on_main_menu_clicked, on_button_held, NULL);
-    x += btn_w + spacing;
-
-    ui_add_button(ctx, x, top_y, btn_w, 50, "SKYBOX",
-                  on_skybox_clicked, on_button_held, NULL);
-    x += btn_w + spacing;
-
-    ui_add_button(ctx, x, top_y, btn_w, 50, "TERRAIN",
-                  on_terrain_clicked, on_button_held, NULL);
-    x += btn_w + spacing;
-
-    // add more tabs here later (LIGHTS, FOG, etc.)
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "CAMERA",  on_camera_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "FX",      on_fx_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "INPUT",   on_input_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "LIGHTS",  on_lights_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "MAIN",    on_main_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "MESHES",  on_meshes_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "SKYBOX",  on_skybox_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "SOUNDS",  on_sounds_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "TERRAIN", on_terrain_clicked);
 }
 
 void ui_set_mode(UI_Context* ctx, UI_Mode mode) {
@@ -50,12 +69,36 @@ void ui_set_mode(UI_Context* ctx, UI_Mode mode) {
     add_top_navigation_buttons(ctx);
 
     switch (mode) {
-        case UI_MODE_MAIN_MENU:
-            setup_main_menu_controls(ctx);
+        case UI_MODE_CAMERA:
+            setup_camera_controls(ctx);
+            break;
+
+        case UI_MODE_FX:
+            setup_fx_controls(ctx);
+            break;
+            
+        case UI_MODE_INPUT:
+            setup_input_controls(ctx);
+            break;
+
+        case UI_MODE_LIGHTS:
+            setup_lights_controls(ctx);
+            break;
+
+        case UI_MODE_MAIN:
+            setup_main_controls(ctx);
+            break;
+
+        case UI_MODE_MESHES:
+            setup_meshes_controls(ctx);
             break;
 
         case UI_MODE_SKYBOX:
             setup_skybox_controls(ctx);
+            break;
+
+        case UI_MODE_SOUNDS:
+            setup_sounds_controls(ctx);
             break;
 
         case UI_MODE_TERRAIN:
@@ -74,9 +117,9 @@ void ui_init(UI_Context* ctx) {
     ctx->cursor_captured = 0;        // start with cursor disabled (camera mode)
 
     g_ui_ctx = ctx;                    // <-- important for callbacks
-    ctx->current_mode = UI_MODE_MAIN_MENU;
+    ctx->current_mode = UI_MODE_MAIN;
 
-    ui_set_mode(ctx, UI_MODE_MAIN_MENU);   // builds top bar + main menu
+    ui_set_mode(ctx, UI_MODE_MAIN);   // builds top bar + main menu
 }
 
 void ui_cleanup(UI_Context* ctx) {

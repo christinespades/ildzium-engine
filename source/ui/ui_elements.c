@@ -2,6 +2,7 @@
 #include <stdlib.h>   // malloc, free
 #include <string.h>   // strlen, strcpy
 
+// for default buttons
 void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text,
                    UI_ButtonCallback on_click,
                    UI_ButtonCallback on_held,
@@ -10,7 +11,9 @@ void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text
 
     UI_Button* b = &ctx->buttons[ctx->button_count];
     b->x = x; b->y = y; b->w = w; b->h = h;
-    b->content = text;
+    b->content = text; // read-only
+    b->editable_content = NULL;
+    b->is_editable = false;
     b->on_click = on_click;
     b->on_held = on_held;
     b->on_release = on_release;
@@ -25,12 +28,15 @@ void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text
     ctx->button_count++;
 }
 
+// for read-only text containers
 void ui_add_scrollable_text(UI_Context* ctx, int x, int y, int w, int h, const char* text)
 {
 	if (ctx->button_count >= MAX_BUTTONS) return;
 	UI_Button* b = &ctx->buttons[ctx->button_count];
 	b->x = x; b->y = y; b->w = w; b->h = h;
-	b->content = text;
+	b->content = text; // read-only
+    b->editable_content = NULL;
+    b->is_editable = false;
 	b->on_click = NULL;
 	b->on_held = NULL;
 	b->on_release = NULL;
@@ -41,6 +47,7 @@ void ui_add_scrollable_text(UI_Context* ctx, int x, int y, int w, int h, const c
 	ctx->button_count++;
 }
 
+// for text fields/editables
 void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, const char* initial_text, const char* filepath)
 {
     if (ctx->button_count >= MAX_BUTTONS) return;
@@ -58,17 +65,18 @@ void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, 
 
     size_t len = initial_text ? strlen(initial_text) : 0;
     b->content_capacity = len + 4096;
-	b->content = (char*)malloc(b->content_capacity);
+	b->editable_content = (char*)malloc(b->content_capacity);
 	if (initial_text)
-	    strcpy(b->content, initial_text);
+	    strcpy(b->editable_content, initial_text);
 	else
-	    b->content[0] = '\0';
+	    b->editable_content[0] = '\0';
 	
     b->filepath = _strdup(filepath);
 
     ctx->button_count++;
 }
 
+// for slider-like buttons
 void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
                   const char* text,
                   float* target,
@@ -80,7 +88,9 @@ void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
     UI_Button* b = &ctx->buttons[ctx->button_count];
     
     b->x = x; b->y = y; b->w = w; b->h = h;
-    b->content = text;
+    b->content = text; // read-only
+    b->editable_content = NULL;
+    b->is_editable = false;
     b->on_click = NULL;
     b->on_held = NULL;
     b->on_release = NULL;

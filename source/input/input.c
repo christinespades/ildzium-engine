@@ -75,7 +75,7 @@ void handle_editor_keys(int key, int action, int mods)
             insert_char_at_cursor(b, '\n');
         }
         else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_S) {
-            save_file(b->filepath, b->content);
+            save_file(b->filepath, b->editable_content);
         }
         else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_C) {
             copy_selection_to_clipboard(b);

@@ -92,7 +92,8 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
 
 // ====================== DRAW HELPERS ======================
 void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float dt) {
-    if (!b->is_editable || !b->content) return;
+    const char* text = b->is_editable ? b->editable_content : b->content;
+    if (!text) return;
 
     int padding = 12;
     int line_numbers_width = 50;                    // space for line numbers
@@ -102,7 +103,7 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
     // Recalculate content height
     if (b->content_height <= 0.0f) {
         int num_lines = 1;
-        for (const char* p = b->content; *p; p++) {
+        for (const char* p = text; *p; p++) {
             if (*p == '\n') num_lines++;
         }
         b->content_height = (float)num_lines * b->line_height;
@@ -121,7 +122,7 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
     // 2. Main text
     draw_multiline_text(fb, fb_width, fb_height,
                         text_x, draw_y,
-                        b->content, 0xFFFFFFFF, 1, b->line_height);
+                        text, 0xFFFFFFFF, 1, b->line_height);
 
     // 3. Selection Highlighting (per-line accurate)
     draw_selection_highlighting(b, fb, fb_width, fb_height, text_x, draw_y);
@@ -133,7 +134,7 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
         int cursor_line = 0;
         int cursor_col = 0;
         int idx = 0;
-        for (const char* p = b->content; *p && idx < b->cursor_pos; p++, idx++) {
+        for (const char* p = text; *p && idx < b->cursor_pos; p++, idx++) {
             if (*p == '\n') {
                 cursor_line++;
                 cursor_col = 0;
@@ -195,7 +196,7 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
         }
 
         // Draw editor if it's an editable text area
-        if (b->is_editable && b->content) {
+        if (b->is_editable && b->editable_content) {
             draw_editor(b, fb, fb_width, fb_height, dt);
             draw_scrollbar(b, fb, fb_width, fb_height);
         }
@@ -279,10 +280,10 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
 }
 
 // ====================== SELECTION & LINE NUMBERS ======================
-
 // Draw accurate per-line selection highlighting
+// For both read-only text (content) and mutable text (editable_content)
 void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, int text_x, int draw_y) {
-    if (b->selection_start == -1 || !b->content) return;
+    if (b->selection_start == -1 || !b->content && !b->editable_content) return;
 
     int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
     int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
@@ -291,7 +292,7 @@ void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int f
     int line_height = b->line_height;
     int char_width = 8;                     // your font width
 
-    const char* p = b->content;
+    const char* p = b->is_editable ? b->editable_content : b->content;
     int current_line = 0;
     int char_idx = 0;
     int line_start_x = text_x;
@@ -339,11 +340,11 @@ void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int f
 
 // Draw line numbers
 void draw_line_numbers(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, int text_x, int draw_y) {
-    if (!b->content) return;
+    if (!b->editable_content) return; // only line numbers for mutable texts
 
     int line_height = b->line_height;
     int num_lines = 1;
-    for (const char* p = b->content; *p; p++) {
+    for (const char* p = b->editable_content ; *p; p++) {
         if (*p == '\n') num_lines++;
     }
 
