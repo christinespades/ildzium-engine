@@ -1,3 +1,4 @@
+#include "core/debug.h"
 #include "core/fonts.h"
 #include "core/settings.h"
 #include "ui/ui_draw.h"
@@ -92,62 +93,64 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
 
 // ====================== DRAW HELPERS ======================
 void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float dt) {
-    const char* text = b->is_editable ? b->editable_content : b->content;
-    if (!text) return;
+    LOG_SCOPE() {
+        const char* text = b->is_editable ? b->editable_content : b->content;
+        if (!text) return;
 
-    int padding = 12;
-    int line_numbers_width = 50;                    // space for line numbers
-    int text_x = b->x + padding + line_numbers_width;
-    int text_y_base = b->y + padding;
+        int padding = 12;
+        int line_numbers_width = 50;                    // space for line numbers
+        int text_x = b->x + padding + line_numbers_width;
+        int text_y_base = b->y + padding;
 
-    // Recalculate content height
-    if (b->content_height <= 0.0f) {
-        int num_lines = 1;
-        for (const char* p = text; *p; p++) {
-            if (*p == '\n') num_lines++;
-        }
-        b->content_height = (float)num_lines * b->line_height;
-    }
-
-    // Clamp scroll
-    float visible_h = (float)(b->h - 2 * padding);
-    float max_scroll = fmaxf(0.0f, b->content_height - visible_h);
-    b->scroll_offset = fmaxf(0.0f, fminf(b->scroll_offset, max_scroll));
-
-    int draw_y = text_y_base - (int)b->scroll_offset;
-
-    // 1. Line Numbers
-    draw_line_numbers(b, fb, fb_width, fb_height, text_x, draw_y);
-
-    // 2. Main text
-    draw_multiline_text(fb, fb_width, fb_height,
-                        text_x, draw_y,
-                        text, 0xFFFFFFFF, 1, b->line_height);
-
-    // 3. Selection Highlighting (per-line accurate)
-    draw_selection_highlighting(b, fb, fb_width, fb_height, text_x, draw_y);
-
-    // 4. Blinking Cursor
-    static float blink_timer = 0.0f;
-    blink_timer += dt;
-    if (((int)(blink_timer * 3) % 2) == 0) {
-        int cursor_line = 0;
-        int cursor_col = 0;
-        int idx = 0;
-        for (const char* p = text; *p && idx < b->cursor_pos; p++, idx++) {
-            if (*p == '\n') {
-                cursor_line++;
-                cursor_col = 0;
-            } else {
-                cursor_col++;
+        // Recalculate content height
+        if (b->content_height <= 0.0f) {
+            int num_lines = 1;
+            for (const char* p = text; *p; p++) {
+                if (*p == '\n') num_lines++;
             }
+            b->content_height = (float)num_lines * b->line_height;
         }
 
-        int cursor_screen_x = text_x + cursor_col * 8;
-        int cursor_screen_y = draw_y + cursor_line * b->line_height;
+        // Clamp scroll
+        float visible_h = (float)(b->h - 2 * padding);
+        float max_scroll = fmaxf(0.0f, b->content_height - visible_h);
+        b->scroll_offset = fmaxf(0.0f, fminf(b->scroll_offset, max_scroll));
 
-        draw_rect(fb, fb_width, fb_height,
-                  cursor_screen_x, cursor_screen_y, 2, b->line_height, 0xFFFFAA00);
+        int draw_y = text_y_base - (int)b->scroll_offset;
+
+        // 1. Line Numbers
+        draw_line_numbers(b, fb, fb_width, fb_height, text_x, draw_y);
+
+        // 2. Main text
+        draw_multiline_text(fb, fb_width, fb_height,
+                            text_x, draw_y,
+                            text, 0xFFFFFFFF, 1, b->line_height);
+
+        // 3. Selection Highlighting (per-line accurate)
+        draw_selection_highlighting(b, fb, fb_width, fb_height, text_x, draw_y);
+
+        // 4. Blinking Cursor
+        static float blink_timer = 0.0f;
+        blink_timer += dt;
+        if (((int)(blink_timer * 3) % 2) == 0) {
+            int cursor_line = 0;
+            int cursor_col = 0;
+            int idx = 0;
+            for (const char* p = text; *p && idx < b->cursor_pos; p++, idx++) {
+                if (*p == '\n') {
+                    cursor_line++;
+                    cursor_col = 0;
+                } else {
+                    cursor_col++;
+                }
+            }
+
+            int cursor_screen_x = text_x + cursor_col * 8;
+            int cursor_screen_y = draw_y + cursor_line * b->line_height;
+
+            draw_rect(fb, fb_width, fb_height,
+                      cursor_screen_x, cursor_screen_y, 2, b->line_height, 0xFFFFAA00);
+        }
     }
 }
 

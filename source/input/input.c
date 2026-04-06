@@ -62,6 +62,12 @@ void handle_editor_keys(int key, int action, int mods)
                 b->selection_start = b->selection_end = -1;
             }
         }
+        else if (key == GLFW_KEY_UP) {
+            move_cursor_vertical(b, -1);
+        }
+        else if (key == GLFW_KEY_DOWN) {
+            move_cursor_vertical(b, +1);
+        }
         else if (key == GLFW_KEY_HOME) {
             move_to_home(b);
             if (!shift) b->selection_start = b->selection_end = -1;
@@ -83,7 +89,20 @@ void handle_editor_keys(int key, int action, int mods)
         else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_V) {
             paste_from_clipboard(b);
         }
-        else if (key == GLFW_KEY_TAB) return;
+        else if (key == GLFW_KEY_TAB) {
+            if (g_ui_ctx->focused_button == b) {
+                // editor handles TAB → insert spaces
+                insert_char_at_cursor(b, ' ');
+                insert_char_at_cursor(b, ' ');
+                insert_char_at_cursor(b, ' ');
+                insert_char_at_cursor(b, ' ');
+                // keep focus in editor; do NOT clear it
+            } else {
+                // normal TAB navigation outside editor
+                g_ui_ctx->focused_button = NULL;
+            }
+            return;
+        }
         if (key == GLFW_KEY_ESCAPE) return;
     }
 }

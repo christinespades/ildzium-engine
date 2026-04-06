@@ -56,16 +56,16 @@ void setup_skybox_controls(UI_Context* ctx)
                  "Nebula Layers", &g_skyParams.nebulaLayerCount, 1.0f, 8.0f);
 
     ui_add_tuner(g_ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
-                 "Star Count", &g_skyParams.starCount, 0.0f, 2500.0f);
+                 "No Effect...", &g_skyParams.starCount, 0.0f, 2500.0f);
 
     ui_add_tuner(g_ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
-                 "Star Brightness", &g_skyParams.starBrightness, 0.0f, 5.0f);
+                 "No Effect...", &g_skyParams.starBrightness, 0.0f, 5.0f);
 
     ui_add_tuner(g_ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
-                 "Star Twinkle", &g_skyParams.starTwinkleSpeed, 0.0f, 20.0f);
+                 "Vertical Cloud Brightness", &g_skyParams.starTwinkleSpeed, -20.0f, 20.0f);
 
     ui_add_tuner(g_ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
-                 "Star Size", &g_skyParams.starSize, 0.001f, 0.3f);
+                 "Vertical Cloud Speed", &g_skyParams.starSize, -10.0f, 10.0f);
 
     ui_add_tuner(g_ui_ctx, start_x, start_y + idx++ * spacing, btn_w, btn_h,
                  "Time of Day", &g_skyParams.timeOfDay, 0.0f, 1.0f);

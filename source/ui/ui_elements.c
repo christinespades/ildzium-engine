@@ -1,3 +1,4 @@
+#include "core/debug.h"
 #include "ui/ui_elements.h"
 #include <stdlib.h>   // malloc, free
 #include <string.h>   // strlen, strcpy
@@ -65,13 +66,16 @@ void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, 
 
     size_t len = initial_text ? strlen(initial_text) : 0;
     b->content_capacity = len + 4096;
-	b->editable_content = (char*)malloc(b->content_capacity);
+	b->editable_content = (char*)LOG_MALLOC(b->content_capacity);
 	if (initial_text)
 	    strcpy(b->editable_content, initial_text);
 	else
 	    b->editable_content[0] = '\0';
 	
     b->filepath = _strdup(filepath);
+
+    // Mark as focused. This means the last created editable text in a given ctx gets focus.
+    ctx->focused_button = b;
 
     ctx->button_count++;
 }

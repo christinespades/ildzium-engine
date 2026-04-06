@@ -51,7 +51,6 @@ typedef struct UI_Context {
     int cursor_captured;
     uint8_t* button_held_last_frame;
     UI_Mode current_mode;
-    bool has_focused_editor;        // to know if we should route text input
     UI_Button* focused_button;      // or just check the one with is_editable
 } UI_Context;
 

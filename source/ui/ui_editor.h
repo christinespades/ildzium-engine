@@ -7,6 +7,7 @@ void delete_char_before_cursor(UI_Button* b);
 void delete_char_at_cursor(UI_Button* b);
 void move_cursor_left(UI_Button* b, int steps);
 void move_cursor_right(UI_Button* b, int steps);
+void move_cursor_vertical(UI_Button* b, int direction);
 void move_to_home(UI_Button* b);
 void move_to_end(UI_Button* b);
 int get_text_length(UI_Button* b);
