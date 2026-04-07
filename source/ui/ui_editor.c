@@ -1,5 +1,6 @@
 #include "ui_editor.h"
 #include "ui/ui_params.h"
+#include "ui/ui_editor_undo.h"
 #include <GLFW/glfw3.h>
 #include <ctype.h>    // isalnum
 #include <stdlib.h>   // malloc, free
@@ -43,6 +44,8 @@ void ensure_capacity(UI_Button* b, size_t needed) {
 void insert_char_at_cursor(UI_Button* b, char c) {
     if (!b->is_editable || !b->editable_content) return;
 
+    push_undo_state(b);
+
     // Delete selection first if any
     if (b->selection_start != -1) {
         int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
@@ -63,6 +66,9 @@ void insert_char_at_cursor(UI_Button* b, char c) {
 
 void delete_char_before_cursor(UI_Button* b) {
     if (!b->is_editable || b->cursor_pos <= 0) return;
+
+    push_undo_state(b);
+
     if (b->selection_start != -1) {
         int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
         int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
@@ -80,6 +86,8 @@ void delete_char_at_cursor(UI_Button* b) {
     if (!b->is_editable) return;
     size_t len = strlen(b->editable_content);
     if (b->cursor_pos >= len) return;
+
+    push_undo_state(b);
 
     if (b->selection_start != -1) {
         int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
@@ -173,6 +181,8 @@ void paste_from_clipboard(UI_Button* b) {
     const char* clipboard = glfwGetClipboardString(g_window);
     if (!clipboard || !*clipboard) return;
 
+    push_undo_state(b);
+
     // Delete current selection first
     if (b->selection_start != -1) {
         int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
@@ -194,44 +204,46 @@ void paste_from_clipboard(UI_Button* b) {
 }
 
 // ====================== MOUSE TO CURSOR ======================
-int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y) {
-    if (!b->content && !b->editable_content) return 0;
+int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y)
+{
+    if ((!b->content && !b->editable_content) || b->line_height <= 0) return 0;
 
     int padding = 12;
     int text_x = b->x + padding;
-    if (b->is_editable) text_x += LINE_NUMBERS_WIDTH; // account for line numbers in editable text
-    int text_y = b->y + padding;
+    if (b->is_editable) text_x += LINE_NUMBERS_WIDTH;
 
+    int text_y = b->y + padding;
     int rel_x = mouse_x - text_x;
     int rel_y = mouse_y - text_y + (int)b->scroll_offset;
 
     if (rel_x < 0) rel_x = 0;
     if (rel_y < 0) rel_y = 0;
 
-    int line_height = b->line_height;
-    if (line_height <= 0) line_height = 1;
-    int target_line = rel_y / line_height;
+    int target_line = rel_y / b->line_height;
 
-    // Find start of target line
     const char* p = b->is_editable ? b->editable_content : b->content;
-    int current_line = 0;
     int char_index = 0;
+    int current_line = 0;
 
-    while (*p && current_line < target_line) {
+    // Skip to target line
+    while (*p && current_line < target_line)
+    {
         if (*p == '\n') current_line++;
         p++;
         char_index++;
     }
 
-    // Now walk horizontally on this line
+    // Now walk horizontally on the line (more forgiving at end of line)
     int x_pos = 0;
-    while (*p && *p != '\n') {
-        if (x_pos + FONT_WIDTH > rel_x) break;   // 8 = char width (your font)
+    while (*p && *p != '\n')
+    {
+        if (x_pos + FONT_WIDTH / 2 > rel_x) break;   // better threshold (half char width)
         x_pos += FONT_WIDTH;
         p++;
         char_index++;
     }
 
+    // If clicked past the end of the line, go to end of line instead of next line
     return char_index;
 }
 

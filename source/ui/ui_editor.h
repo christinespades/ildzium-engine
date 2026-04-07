@@ -15,3 +15,6 @@ void copy_selection_to_clipboard(UI_Button* b);
 void paste_from_clipboard(UI_Button* b);
 int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y);
 void select_word_at_position(UI_Button* b, int click_pos);
+void perform_undo(UI_Button* b);
+void perform_redo(UI_Button* b);
+void init_editor_undo(UI_Button* b, int max_steps);

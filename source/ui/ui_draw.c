@@ -142,6 +142,14 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
         if (b->target_value) {
             int mid = b->x + b->w / 2;
             draw_rect(fb, fb_width, fb_height, mid, b->y + 4, 2, b->h - 8, 0x00000000);
+
+            // Current value
+            char val[32];
+            // ensure pointer is valid
+            float value = *b->target_value; 
+            snprintf(val, sizeof(val), "%.3f", value);
+            draw_text(fb, fb_width, fb_height, val, 
+                      b->x + 20, b->y + b->h - 16, 0xFFFFAA00, 2);
         }
 
         // Draw editor if it's an editable text area
@@ -171,14 +179,6 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
                                     0xFFFFFFFF, scale, line_h);
             }
         }
-
-        // Current value
-        if (b->target_value) {
-            char val[32];
-            snprintf(val, sizeof(val), "%.3f", b->target_value);
-            draw_text(fb, fb_width, fb_height, val, 
-                      b->x + 20, b->y + b->h - 16, 0xFFFFAA00, 2);
-        }
     }
 
     ui_draw_info(fb, fb_width, fb_height, dt); // fps, ui focus, debug, etc
@@ -187,6 +187,7 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
 // ====================== SELECTION & LINE NUMBERS ======================
 // Draw accurate per-line selection highlighting
 // For both read-only text (content) and mutable text (editable_content)
+// Draw accurate per-character selection highlighting (black)
 void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int fb_height,
                                  int text_x, int draw_y)
 {
@@ -198,51 +199,53 @@ void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int f
     if (start == end) return;
 
     int line_height = b->line_height;
+    if (line_height <= 0) line_height = FONT_HEIGHT + 4; // fallback
+
     int current_line = 0;
     int char_idx = 0;
-    const char* line_start_ptr = p;
+    const char* line_start = p;
 
     while (*p && char_idx < end)
     {
         if (char_idx >= start)
         {
-            // Process one line of selection
-            int line_char_count = 0;
+            // Find how many characters are selected on this line
+            int line_sel_start = (start > char_idx) ? (start - char_idx) : 0;
+            int line_sel_end = 0;
 
-            while (*p && *p != '\n' && char_idx < end)
+            const char* q = p;
+            int temp_idx = char_idx;
+            while (*q && *q != '\n' && temp_idx < end)
             {
-                p++;
-                char_idx++;
-                line_char_count++;
+                q++;
+                temp_idx++;
+                line_sel_end++;
             }
 
-            int sel_from = (start > (char_idx - line_char_count)) ? (start - (char_idx - line_char_count)) : 0;
-            int sel_to   = (char_idx >= end) ? (end - (char_idx - line_char_count)) : line_char_count;
+            int sel_from = line_sel_start;
+            int sel_to   = (temp_idx >= end) ? (end - char_idx) : line_sel_end;
 
             if (sel_to > sel_from)
             {
                 int highlight_x = text_x + sel_from * FONT_WIDTH;
                 int highlight_w = (sel_to - sel_from) * FONT_WIDTH;
-
                 int highlight_y = draw_y + current_line * line_height;
 
-                // Clip the highlight rect to button area (important!)
-                // For simplicity we clip to framebuffer, but ideally also to b->x/b->y/b->w/b->h
+                // Black selection with good opacity (text stays readable)
                 draw_rect(fb, fb_width, fb_height,
-                          highlight_x,
-                          highlight_y,
-                          highlight_w,
-                          line_height,
-                          0x4080C0FF); // selection color
+                          highlight_x, highlight_y,
+                          highlight_w, line_height,
+                          0x000000CC);   // <-- changed to black
             }
         }
 
+        // Advance to next line
         if (*p == '\n')
         {
             p++;
-            current_line++;
             char_idx++;
-            line_start_ptr = p;
+            current_line++;
+            line_start = p;
         }
         else if (*p)
         {

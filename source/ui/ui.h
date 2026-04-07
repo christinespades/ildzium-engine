@@ -2,6 +2,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef struct {
+    char* text;          // full content at that moment
+    int   cursor_pos;
+    int   selection_start;
+    int   selection_end;
+} EditorState;
+
 typedef struct UI_Button {
     int x, y;           // top-left position
     int w, h;           // width and height
@@ -10,7 +17,7 @@ typedef struct UI_Button {
     void (*on_held)(void);
     void (*on_release)(void);
 
-    float target_value;   // NULL = normal button, otherwise we increment this
+    float* target_value;   // NULL = normal button, otherwise we increment this
     float  step_size;      // how much to add while held
     float  min_value;
     float  max_value;
@@ -27,9 +34,24 @@ typedef struct UI_Button {
     float content_height;       // total height needed for text
     int line_height;            // approx pixels per line (set during draw)
 
-    double last_click_time;     // use glfwGetTime()
+    int last_click_pos;
+    int click_count;
+    double last_click_time;   // use glfwGetTime() or your timer
+    bool is_dragging;
+    int drag_start_pos;
     int last_click_x, last_click_y;
     char* filepath;
+
+    EditorState* undo_stack;
+    int          undo_count;
+    int          undo_capacity;
+
+    EditorState* redo_stack;
+    int          redo_count;
+    int          redo_capacity;
+
+    // optional: limit memory usage
+    int          max_undo_steps;   // e.g. 100 or 500
 } UI_Button;
 
 typedef enum {
@@ -67,7 +89,7 @@ void ui_add_button(UI_Context* ctx, int x, int y, int w, int h,
 // Generic tuner button (left = decrease, right = increase)
 void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
                   const char* text,
-                  float target,
+                  float* target,
                   float min_val,
                   float max_val);
 void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt);

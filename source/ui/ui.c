@@ -23,6 +23,8 @@ extern void setup_skybox_controls(UI_Context* ctx);
 extern void setup_sounds_controls(UI_Context* ctx);
 extern void setup_terrain_controls(UI_Context* ctx);
 
+extern GLFWwindow* g_window; 
+
 float mouse_wheel_sensitivity = 40.0f;
 
 static void add_top_button(UI_Context *ctx,
@@ -130,13 +132,67 @@ void ui_cleanup(UI_Context* ctx) {
     ctx->button_count = 0;
 }
 
+// New helper: select entire current line
+void select_entire_line(UI_Button* b, int click_pos)
+{
+    const char* text = b->editable_content;
+    if (!text) return;
+
+    int len = (int)strlen(text);
+
+    // Find start of line
+    int start = click_pos;
+    while (start > 0 && text[start-1] != '\n') start--;
+
+    // Find end of line
+    int end = click_pos;
+    while (end < len && text[end] != '\n') end++;
+
+    b->selection_start = start;
+    b->selection_end = end;
+    b->cursor_pos = end;
+}
+
+// Mouse motion (dragging)
+void ui_button_mouse_drag(UI_Button* b, int mouse_x, int mouse_y)
+{
+    if (!b->is_dragging || !b->is_editable) return;
+
+    int current_pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
+
+    if (b->click_count == 1)   // normal drag selection
+    {
+        b->selection_start = b->drag_start_pos;
+        b->selection_end = current_pos;
+        b->cursor_pos = current_pos;
+    }
+    else if (b->click_count == 2)   // word-by-word drag after double-click
+    {
+        // Optional: expand word selection while dragging (many editors do this)
+        // For simplicity you can keep normal selection here
+        b->selection_start = b->drag_start_pos;
+        b->selection_end = current_pos;
+        b->cursor_pos = current_pos;
+    }
+}
+
+void ui_button_mouse_up(UI_Button* b)
+{
+    b->is_dragging = false;
+}
+
+/*
+something weird. the selection highlight still appears transparent, but masks the text so it cant be read, and it flickers, sometimes just a single click on a world selects the whole line, other times it just selects the word. 
+
+
+fps bar 
+*/
 void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt)
 {
     if (!ctx->cursor_captured) return;
 
     static double last_click_time = 0.0;
     static int last_click_button_index = -1;
-    double current_time = glfwGetTime();
 
     for (int i = 0; i < ctx->button_count; i++) {
         UI_Button* b = &ctx->buttons[i];
@@ -155,31 +211,64 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
 
             // Left click - set cursor / start selection
             if (is_pressed) {
-                int new_cursor = get_char_index_from_mouse(b, mouse_x, mouse_y);
+                double now = glfwGetTime();
+                int pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
 
-                // Double-click detection
-                if (current_time - last_click_time < 0.35 && last_click_button_index == i) {
-                    // Double click → select word
-                    select_word_at_position(b, new_cursor);
-                } else {
-                    // Single click
-                    b->cursor_pos = new_cursor;
-                    b->selection_start = b->selection_end = new_cursor;   // start new selection
+                b->is_dragging = true;
+                b->drag_start_pos = pos;
+
+                if (glfwGetKey(g_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                    glfwGetKey(g_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                {
+                    // Extend existing selection
+                    if (b->selection_start == -1)
+                        b->selection_start = b->cursor_pos;
+
+                    int new_pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
+                    b->selection_end = new_pos;
+                    b->cursor_pos = new_pos;
+                    return;
                 }
 
-                last_click_time = current_time;
-                last_click_button_index = i;
+                // Detect double / triple click
+                if (now - b->last_click_time < 0.35 && pos == b->last_click_pos)   // 350ms threshold
+                {
+                    b->click_count++;
+                }
+                else
+                {
+                    b->click_count = 1;
+                }
+
+                b->last_click_time = now;
+                b->last_click_pos = pos;
+
+                if (b->click_count == 1)
+                {
+                    // Single click: just move caret, clear selection
+                    b->cursor_pos = pos;
+                    b->selection_start = b->selection_end = -1;
+                }
+                else if (b->click_count == 2)
+                {
+                    // Double click: select word
+                    select_word_at_position(b, pos);
+                    b->cursor_pos = b->selection_end;
+                }
+                else if (b->click_count >= 3)
+                {
+                    // Triple click: select entire line
+                    select_entire_line(b, pos);
+                    b->click_count = 0; // reset so quadruple doesn't do weird things
+                }
+
+                b->content_height = 0.0f; // invalidate layout if needed
             }
-            // Mouse drag → update selection end
-            else if (ctx->button_held_last_frame[i] && mouse_pressed) {
-                int new_pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
-                b->selection_end = new_pos;
-                b->cursor_pos = new_pos;   // cursor follows mouse during drag
-            }
+            return;
         }
 
         // === TUNING LOGIC (while held) ===
-        if (is_pressed && b->target_value != 0.0f) {
+        if (is_pressed && b->target_value != NULL) {
             if (!ctx->button_held_last_frame[i]) b->hold_time = 0.0f;  // reset per button on new press
 
             b->hold_time += dt;  // accumulate seconds held
@@ -201,15 +290,15 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
             float delta = step * speed * dt;  // scale by dt
 
             if (mouse_x < b->x + b->w / 2) {
-                b->target_value -= delta;  // left decreases
+                *b->target_value -= delta;  // left decreases
             } else {
-                b->target_value += delta;  // right increases
+                *b->target_value += delta;  // right increases
             }
 
             // Clamp to limits
-            if (b->target_value < b->min_value) b->target_value = b->min_value;
-            if (b->target_value > b->max_value) b->target_value = b->max_value;
-        } else if (!is_pressed && b->target_value != 0.0f) {
+            if (*b->target_value < b->min_value) *b->target_value = b->min_value;
+            if (*b->target_value > b->max_value) *b->target_value = b->max_value;
+        } else if (!is_pressed && b->target_value != NULL) {
             b->hold_time = 0.0f;  // reset when released
         }
 
@@ -221,6 +310,7 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
             if (b->on_click) b->on_click();
         }
         if (!is_pressed && ctx->button_held_last_frame[i]) {
+            ui_button_mouse_up(b);
             if (b->on_release) b->on_release();
         }
 

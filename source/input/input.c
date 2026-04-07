@@ -98,6 +98,14 @@ void handle_editor_keys(int key, int action, int mods, GLFWwindow* window)
         else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_V) {
             paste_from_clipboard(b);
         }
+        else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_Z) {
+            perform_undo(b);
+            return;
+        }
+        else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_Y) {
+            perform_redo(b);
+            return;
+        }
         return;
     }
 }

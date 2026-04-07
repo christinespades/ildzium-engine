@@ -27,7 +27,6 @@ layout(set = 0, binding = 0) uniform SkyUBO {
 
 layout(set = 0, binding = 1) uniform samplerCube starCubemap;
 
-// === Noise functions (unchanged) ===
 vec3 hash33(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);
@@ -61,7 +60,7 @@ float fbm(vec3 p, int octaves) {
 void main() {
     vec2 uv = vUV * 2.0 - 1.0;
 
-    vec3 rd = normalize(vec3(-uv, 1.6));                    // tweak 1.6 if FOV feels wrong
+    vec3 rd = normalize(vec3(-uv, 1.6));
     vec3 dir = (ubo.inverseView * vec4(rd, 0.0)).xyz;
     dir = normalize(dir);
 
@@ -80,8 +79,7 @@ void main() {
 
         col += nebulaColor * n * ubo.nebulaIntensity * (0.65 + 0.35 * ubo.dayNightBlend);
     }
-
-    // === Best round stars version ===
+
     vec3 stars = vec3(0.0);
 
     for (float i = 0.0; i < min(ubo.starCount, 1000.0); i++) {
@@ -106,7 +104,6 @@ void main() {
     float aurora = pow(max(sin(dir.y * 8.0 + t * ubo.auroraSpeed) * 0.5 + 0.5, 0.0), 2.3);
     col += ubo.auroraColor.rgb * aurora * ubo.auroraIntensity * (1.0 - ubo.dayNightBlend);
 
-    // === Final ===
     col *= 1.0 - length(uv) * ubo.vignetteStrength * 0.8;
     col *= ubo.overallBrightness;
 

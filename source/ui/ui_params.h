@@ -3,6 +3,7 @@
 // other ui modules also use it
 
 #define UI_CONTAINER_PADDING 70 // used for the main box inside each ui_ctx
+#define UNDO_HISTORY_AMOUNT 512
 #define FONT_WIDTH   8
 #define FONT_HEIGHT  8
 #define LINE_NUMBERS_WIDTH 50
