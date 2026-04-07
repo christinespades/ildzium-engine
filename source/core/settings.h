@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 
 typedef enum {
     RENDERER_NONE      = 0,

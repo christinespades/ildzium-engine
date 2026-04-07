@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ui/ui.h"
 #include "ui/ui_elements.h"
+#include "ui/ui_params.h"
 #include <GLFW/glfw3.h>
 
 extern GLFWwindow* g_window;
@@ -42,11 +43,10 @@ void setup_main_controls(UI_Context* ctx) {
 
     int screen_w, screen_h;
     glfwGetWindowSize(g_window, &screen_w, &screen_h);
-    int padding = 40;
-    int x = padding;
-    int y = padding;
-    int w = screen_w - padding * 2;
-    int h = screen_h - padding * 2;
+    int x = UI_CONTAINER_PADDING;
+    int y = UI_CONTAINER_PADDING;
+    int w = screen_w - UI_CONTAINER_PADDING * 2;
+    int h = screen_h - UI_CONTAINER_PADDING * 2;
 
     // === Markdown processor with header levels ===
     static char processed[131072];
@@ -58,7 +58,7 @@ void setup_main_controls(UI_Context* ctx) {
     while (*src) {
         // Detect headers at start of line
         if ((*src == '#' ) && (src == readme || *(src-1) == '\n' || *(src-1) == '\r')) {
-            *dst++ = '\n';
+            if (dst > processed && *(dst-1) != '\n') *dst++ = '\n';
             *dst++ = '\n';
             header_level = 0;
             while (*src == '#') {
@@ -89,7 +89,7 @@ void setup_main_controls(UI_Context* ctx) {
 
         // Blockquotes
         else if (*src == '>' && (src == readme || *(src-1) == '\n' || *(src-1) == '\r')) {
-            *dst++ = '\n';
+            if (dst > processed && *(dst-1) != '\n') *dst++ = '\n';
             *dst++ = '\n';
             strcpy(dst, "“");
 			dst += strlen("“");
@@ -100,7 +100,7 @@ void setup_main_controls(UI_Context* ctx) {
 
         // Code blocks (simple detection)
         else if (src[0] == '`' && src[1] == '`' && src[2] == '`') {
-            *dst++ = '\n';
+            if (dst > processed && *(dst-1) != '\n') *dst++ = '\n';
             *dst++ = '\n';
             *dst++ = '[';
             *dst++ = 'C';

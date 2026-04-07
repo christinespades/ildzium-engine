@@ -5,6 +5,12 @@ setlocal enabledelayedexpansion
 set BUILD_DIR=builds\debug
 set OUT_EXE=ildzium.exe
 
+set LOG_FLAGS=
+for %%a in (%*) do (
+    if /I "%%a"=="-LOG_SCOPE" set LOG_FLAGS=!LOG_FLAGS! /DLOG_SCOPE_ENABLED
+    if /I "%%a"=="-LOG_MALLOC" set LOG_FLAGS=!LOG_FLAGS! /DLOG_MALLOC_ENABLED
+)
+
 :: Vulkan
 set "VULKAN_INCLUDE=%VULKAN_SDK%\Include"
 set "VULKAN_LIB=%VULKAN_SDK%\Lib"
@@ -46,8 +52,8 @@ if errorlevel 1 (
     pause
     exit /b
 )
-cl /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4267 /wd4244 %SRC_FILES% ^
-    /Zi /W3 /MD /nologo ^
+cl %LOG_FLAGS% /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4047 /wd4100 /wd4267 /wd4244 %SRC_FILES% ^
+    /Zi /Od /RTC1 /GS /W3 /W4 /WX /MD /nologo ^
     /I"source" ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^

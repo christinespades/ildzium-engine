@@ -26,7 +26,16 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
     }
 }
 
-void handle_editor_keys(int key, int action, int mods)
+static void input_toggle_mode(GLFWwindow* window)
+{
+    g_ui_ctx->cursor_captured = !g_ui_ctx->cursor_captured;
+
+    glfwSetInputMode(window,
+        GLFW_CURSOR,
+        g_ui_ctx->cursor_captured ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+}
+
+void handle_editor_keys(int key, int action, int mods, GLFWwindow* window)
 {
     if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
 
@@ -89,21 +98,7 @@ void handle_editor_keys(int key, int action, int mods)
         else if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_V) {
             paste_from_clipboard(b);
         }
-        else if (key == GLFW_KEY_TAB) {
-            if (g_ui_ctx->focused_button == b) {
-                // editor handles TAB → insert spaces
-                insert_char_at_cursor(b, ' ');
-                insert_char_at_cursor(b, ' ');
-                insert_char_at_cursor(b, ' ');
-                insert_char_at_cursor(b, ' ');
-                // keep focus in editor; do NOT clear it
-            } else {
-                // normal TAB navigation outside editor
-                g_ui_ctx->focused_button = NULL;
-            }
-            return;
-        }
-        if (key == GLFW_KEY_ESCAPE) return;
+        return;
     }
 }
 
@@ -113,26 +108,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (!g_ui_ctx) return;
     if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
 
-    if (key == GLFW_KEY_ESCAPE) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-        return;
-    }
-
+    // Handle universal key actions first
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        g_ui_ctx->cursor_captured = !g_ui_ctx->cursor_captured;
-
-        glfwSetInputMode(window,
-            GLFW_CURSOR,
-            g_ui_ctx->cursor_captured ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+        input_toggle_mode(window);
     }
-
-    // Route editing keys when UI is captured
-    if (g_ui_ctx->cursor_captured) {
-        handle_editor_keys(key, action, mods);
-    }
-
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+    // Route editing keys when UI is captured
+    else if (g_ui_ctx->cursor_captured) {
+        handle_editor_keys(key, action, mods, window);
+    }
 }
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)

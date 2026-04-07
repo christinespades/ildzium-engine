@@ -179,7 +179,7 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
         }
 
         // === TUNING LOGIC (while held) ===
-        if (is_pressed && b->target_value != NULL) {
+        if (is_pressed && b->target_value != 0.0f) {
             if (!ctx->button_held_last_frame[i]) b->hold_time = 0.0f;  // reset per button on new press
 
             b->hold_time += dt;  // accumulate seconds held
@@ -201,15 +201,15 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
             float delta = step * speed * dt;  // scale by dt
 
             if (mouse_x < b->x + b->w / 2) {
-                *b->target_value -= delta;  // left decreases
+                b->target_value -= delta;  // left decreases
             } else {
-                *b->target_value += delta;  // right increases
+                b->target_value += delta;  // right increases
             }
 
             // Clamp to limits
-            if (*b->target_value < b->min_value) *b->target_value = b->min_value;
-            if (*b->target_value > b->max_value) *b->target_value = b->max_value;
-        } else if (!is_pressed && b->target_value != NULL) {
+            if (b->target_value < b->min_value) b->target_value = b->min_value;
+            if (b->target_value > b->max_value) b->target_value = b->max_value;
+        } else if (!is_pressed && b->target_value != 0.0f) {
             b->hold_time = 0.0f;  // reset when released
         }
 

@@ -152,14 +152,14 @@ void create_ui_descriptor() {
 }
 
 void create_ui_quad() {
-    Vertex quadVerts[4] = {
+    Vertex quadVertices[4] = {
         {-1.0f, -1.0f, 0.0f, 0.0f},  // bottom-left  → UV (0,0) = top-left of texture
         { 1.0f, -1.0f, 1.0f, 0.0f},  // bottom-right → UV (1,0)
         {-1.0f,  1.0f, 0.0f, 1.0f},  // top-left     → UV (0,1) = bottom of texture
         { 1.0f,  1.0f, 1.0f, 1.0f}   // top-right
     };
 
-    VkDeviceSize size = sizeof(quadVerts);
+    VkDeviceSize size = sizeof(quadVertices);
 
     VkBufferCreateInfo bufInfo = {0};
     bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -181,7 +181,7 @@ void create_ui_quad() {
 
     void* data;
     vkMapMemory(device, uiVertexBufferMemory, 0, size, 0, &data);
-    memcpy(data, quadVerts, size);
+    memcpy(data, quadVertices, size);
     vkUnmapMemory(device, uiVertexBufferMemory);
 }
 

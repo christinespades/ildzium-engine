@@ -1,155 +1,100 @@
 #include "core/debug.h"
-#include "core/fonts.h"
-#include "core/settings.h"
 #include "ui/ui_draw.h"
+#include "ui/ui_draw_info.h"
+#include "ui/ui_draw_text_rect.h"
 #include "ui/ui.h"
+#include "ui/ui_params.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-static void draw_pixel(uint32_t* fb, int fb_w, int fb_h, int x, int y, uint32_t color) {
-    if (x < 0 || y < 0 || x >= fb_w || y >= fb_h) return;
-    fb[y * fb_w + x] = color;
-}
-
-static void draw_rect(uint32_t* fb, int fb_w, int fb_h, int x, int y, int w, int h, uint32_t color) {
-    for (int j = 0; j < h; j++)
-        for (int i = 0; i < w; i++)
-            draw_pixel(fb, fb_w, fb_h, x+i, y+j, color);
-}
-
-static void draw_char(uint32_t* fb, int fb_w, int fb_h, char c, int x, int y, uint32_t color, int scale) {
-    if ((unsigned char)c >= 128) return;
-    if (scale < 1) scale = 1;
-
-    for (int row = 0; row < 8; row++) {
-        uint8_t bits = font8x8_basic[(unsigned char)c][row];
-        for (int col = 0; col < 8; col++) {
-            if (bits & (1 << (7 - col))) {
-                // Draw scaled pixel block
-                for (int sy = 0; sy < scale; sy++) {
-                    for (int sx = 0; sx < scale; sx++) {
-                        draw_pixel(fb, fb_w, fb_h, x + col*scale + sx, y + row*scale + sy, color);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void draw_text(uint32_t* fb, int fb_w, int fb_h, const char* text, int x, int y, uint32_t color, int scale) {
-    int cursor_x = x;
-    int cursor_y = y;
-    while (*text) {
-        if (*text == '\n') {
-            cursor_y += 8 * scale;   // move down one line
-            cursor_x = x;            // reset horizontal
-            text++;
-            continue;
-        }
-        draw_char(fb, fb_w, fb_h, *text++, cursor_x, cursor_y, color, scale);
-        cursor_x += 8 * scale;
-    }
-}
-
-void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
-                         int x, int y, const char* text,
-                         uint32_t color, int base_scale, int line_height)
-{
-    if (!text || !*text) return;
-
-    char line[512];
-    const char* p = text;
-    int current_y = y;
-
-    while (*p) {
-        int i = 0;
-        while (*p && *p != '\n' && i < 510) {
-            line[i++] = *p++;
-        }
-        line[i] = '\0';
-
-        if (i > 0) {
-            // Check for header control character at start of line
-            int draw_scale = base_scale;
-            int offset_x = 0;
-            const char* lines_to_draw = line;
-
-            if (line[0] >= 0x02 && line[0] <= 0x07) {  // our header marker
-                int level = line[0] - 0x01;
-                draw_scale = (level == 1) ? 2 : (level <= 3 ? 1 : base_scale);  // H1=2x, H2/H3=1x, smaller=normal
-                lines_to_draw = line + 1;  // skip the control char
-                offset_x = 4;          // small indent for headers
-            }
-
-            draw_text(fb, fb_w, fb_h, lines_to_draw, x + offset_x, current_y, color, draw_scale);
-        }
-
-        current_y += line_height;
-        if (*p == '\n') p++;
-    }
-}
-
 // ====================== DRAW HELPERS ======================
-void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float dt) {
-    LOG_SCOPE() {
-        const char* text = b->is_editable ? b->editable_content : b->content;
-        if (!text) return;
+void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float dt)
+{
+    if (!b->is_editable || !b->editable_content || b->editable_content[0] == '\0')
+        return;
 
-        int padding = 12;
-        int line_numbers_width = 50;                    // space for line numbers
-        int text_x = b->x + padding + line_numbers_width;
-        int text_y_base = b->y + padding;
+    // Safety defaults
+    if (b->line_height <= 0)
+        b->line_height = FONT_HEIGHT + 8;   // typical value
 
-        // Recalculate content height
-        if (b->content_height <= 0.0f) {
-            int num_lines = 1;
-            for (const char* p = text; *p; p++) {
-                if (*p == '\n') num_lines++;
-            }
-            b->content_height = (float)num_lines * b->line_height;
+    // === Recalculate content height only when needed (more accurate) ===
+    if (b->content_height <= 0.0f)
+    {
+        int num_lines = 1;
+        for (const char* p = b->editable_content; *p; ++p)
+        {
+            if (*p == '\n')
+                num_lines++;
         }
+        b->content_height = (float)num_lines * b->line_height;
+    }
 
-        // Clamp scroll
-        float visible_h = (float)(b->h - 2 * padding);
-        float max_scroll = fmaxf(0.0f, b->content_height - visible_h);
-        b->scroll_offset = fmaxf(0.0f, fminf(b->scroll_offset, max_scroll));
+    // Clamp cursor
+    size_t text_len = strlen(b->editable_content);
+    if (b->cursor_pos < 0)
+        b->cursor_pos = 0;
+    if ((size_t)b->cursor_pos > text_len)
+        b->cursor_pos = (int)text_len;
 
-        int draw_y = text_y_base - (int)b->scroll_offset;
+    const char* text = b->editable_content;
+    int padding = 12;
+    int text_x = b->x + padding + LINE_NUMBERS_WIDTH;   // make sure LINE_NUMBERS_WIDTH is defined
+    int text_y_base = b->y + padding;
 
-        // 1. Line Numbers
-        draw_line_numbers(b, fb, fb_width, fb_height, text_x, draw_y);
+    // Clamp scroll offset
+    float visible_h = (float)(b->h - 2 * padding);
+    float max_scroll = fmaxf(0.0f, b->content_height - visible_h);
+    b->scroll_offset = fmaxf(0.0f, fminf(b->scroll_offset, max_scroll));
 
-        // 2. Main text
-        draw_multiline_text(fb, fb_width, fb_height,
-                            text_x, draw_y,
-                            text, 0xFFFFFFFF, 1, b->line_height);
+    int draw_y = text_y_base - (int)b->scroll_offset;
 
-        // 3. Selection Highlighting (per-line accurate)
+    // 1. Line Numbers
+    draw_line_numbers(b, fb, fb_width, fb_height, text_x - LINE_NUMBERS_WIDTH, draw_y);
+
+    // 2. Main text
+    draw_multiline_text(fb, fb_width, fb_height,
+                        text_x, draw_y,
+                        text, 0xFFFFFFFF, 1, b->line_height);
+
+    // 3. Selection Highlighting
+    if (b->selection_start != -1)
         draw_selection_highlighting(b, fb, fb_width, fb_height, text_x, draw_y);
 
-        // 4. Blinking Cursor
-        static float blink_timer = 0.0f;
-        blink_timer += dt;
-        if (((int)(blink_timer * 3) % 2) == 0) {
-            int cursor_line = 0;
-            int cursor_col = 0;
-            int idx = 0;
-            for (const char* p = text; *p && idx < b->cursor_pos; p++, idx++) {
-                if (*p == '\n') {
-                    cursor_line++;
-                    cursor_col = 0;
-                } else {
-                    cursor_col++;
-                }
+    // 4. Blinking Cursor
+    static float blink_timer = 0.0f;
+    blink_timer += dt;
+    if (((int)(blink_timer * 3.0f) % 2) == 0)
+    {
+        // Calculate cursor line and column safely
+        int cursor_line = 0;
+        int cursor_col = 0;
+        int idx = 0;
+
+        for (const char* p = text; *p && idx < b->cursor_pos; ++p, ++idx)
+        {
+            if (*p == '\n')
+            {
+                cursor_line++;
+                cursor_col = 0;
             }
+            else
+            {
+                cursor_col++;
+            }
+        }
 
-            int cursor_screen_x = text_x + cursor_col * 8;
-            int cursor_screen_y = draw_y + cursor_line * b->line_height;
+        int cursor_screen_x = text_x + cursor_col * FONT_WIDTH;
+        int cursor_screen_y = draw_y + cursor_line * b->line_height;
 
+        // Extra safety: only draw cursor if it's inside the button area
+        if (cursor_screen_y + b->line_height > b->y && cursor_screen_y < b->y + b->h)
+        {
             draw_rect(fb, fb_width, fb_height,
-                      cursor_screen_x, cursor_screen_y, 2, b->line_height, 0xFFFFAA00);
+                      cursor_screen_x, cursor_screen_y,
+                      2, b->line_height,
+                      0xFFFFAA00);
         }
     }
 }
@@ -173,7 +118,8 @@ void draw_scrollbar(UI_Button* b, uint32_t* fb, int fb_width, int fb_height) {
 
 void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float dt)
 {
-    if (!ctx->cursor_captured) return;
+    if (!ctx || !fb || fb_width <= 0 || fb_height <= 0 || !ctx->cursor_captured)
+        return;
 
     memset(fb, 0, (size_t)fb_width * fb_height * sizeof(uint32_t));
 
@@ -207,47 +153,11 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
         else if (b->content && b->content[0]) {
             int padding = 12;
             int scale = 1;
-            int line_h = 8 * scale + 8;
+            int line_h = FONT_HEIGHT * scale + 8;
             int tx = b->x + padding;
             int ty = b->y + padding;
 
             if (b->is_scrollable) {
-                // Calculate total content height (only once per frame is fine)
-                if (b->content_height == 0.0f) {
-                    int num_lines = 1;
-                    for (const char* p = b->content; *p; p++) {
-                        if (*p == '\n') num_lines++;
-                    }
-                    b->content_height = (float)num_lines * line_h;
-                }
-                if (b->is_scrollable && b->content_height > 0.0f) {
-                    float visible_height = (float)(b->h - 24);           // inner area
-                    float scroll_ratio = visible_height / b->content_height;
-                    float thumb_height = fmaxf(30.0f, visible_height * scroll_ratio);
-
-                    float max_scroll = fmaxf(0.0f, b->content_height - visible_height);
-                    float scroll_progress = (max_scroll > 0.0f) ? (b->scroll_offset / max_scroll) : 0.0f;
-
-                    int scrollbar_x = b->x + b->w - 12;
-                    int scrollbar_y = b->y + 12 + (int)(scroll_progress * (visible_height - thumb_height));
-
-                    // Scrollbar background
-                    draw_rect(fb, fb_width, fb_height, scrollbar_x, b->y + 12, 6, (int)visible_height, 0x40FFFFFF);
-
-                    // Scroll thumb
-                    draw_rect(fb, fb_width, fb_height, scrollbar_x, scrollbar_y, 6, (int)thumb_height, 0xCCFFFFFF);
-                }
-
-                // Clamp scroll
-                float max_scroll = fmaxf(0.0f, b->content_height - (b->h - 2*padding));
-                if (b->scroll_offset > max_scroll) b->scroll_offset = max_scroll;
-                if (b->scroll_offset < 0) b->scroll_offset = 0;
-                
-                if (b->content_height == 0.0f) {
-                    int n = 1;
-                    for (const char* p = b->content; *p; p++) if (*p == '\n') n++;
-                    b->content_height = (float)n * line_h;
-                }
                 // Draw with scroll offset
                 draw_multiline_text(fb, fb_width, fb_height,
                                     tx, ty - (int)b->scroll_offset,
@@ -265,76 +175,77 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
         // Current value
         if (b->target_value) {
             char val[32];
-            snprintf(val, sizeof(val), "%.3f", *b->target_value);
+            snprintf(val, sizeof(val), "%.3f", b->target_value);
             draw_text(fb, fb_width, fb_height, val, 
                       b->x + 20, b->y + b->h - 16, 0xFFFFAA00, 2);
         }
     }
 
-    // Draw FPS
-    if (g_renderer_flags & RENDERER_SHOW_FPS)
-    {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "FPS: %.0f", g_fps);
-
-        draw_text(fb, fb_width, fb_height,
-                  buf, 10, 10, 0xFFFFFFFF, 2);
-    }
+    ui_draw_info(fb, fb_width, fb_height, dt); // fps, ui focus, debug, etc
 }
 
 // ====================== SELECTION & LINE NUMBERS ======================
 // Draw accurate per-line selection highlighting
 // For both read-only text (content) and mutable text (editable_content)
-void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, int text_x, int draw_y) {
-    if (b->selection_start == -1 || !b->content && !b->editable_content) return;
+void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int fb_height,
+                                 int text_x, int draw_y)
+{
+    const char* p = b->is_editable ? b->editable_content : b->content;
+    if (b->selection_start == -1 || !p) return;
 
     int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
     int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
     if (start == end) return;
 
     int line_height = b->line_height;
-    int char_width = 8;                     // your font width
-
-    const char* p = b->is_editable ? b->editable_content : b->content;
     int current_line = 0;
     int char_idx = 0;
-    int line_start_x = text_x;
+    const char* line_start_ptr = p;
 
-    while (*p && char_idx < end) {
-        if (char_idx >= start) {
-            // Start of selection on this line
-            int sel_start_col = (char_idx == start) ? 0 : 0; // will be refined
-            int sel_end_col = 0;
+    while (*p && char_idx < end)
+    {
+        if (char_idx >= start)
+        {
+            // Process one line of selection
+            int line_char_count = 0;
 
-            // Find how many chars to highlight on this line
-            const char* line_start = p;
-            while (*p && *p != '\n' && char_idx < end) {
+            while (*p && *p != '\n' && char_idx < end)
+            {
                 p++;
                 char_idx++;
+                line_char_count++;
             }
-            sel_end_col = (int)(p - line_start);
 
-            if (char_idx > start) {
-                int sel_from = (char_idx - sel_end_col > start) ? 0 : (start - (char_idx - sel_end_col));
-                int sel_to = (char_idx >= end) ? (end - (char_idx - sel_end_col)) : sel_end_col;
+            int sel_from = (start > (char_idx - line_char_count)) ? (start - (char_idx - line_char_count)) : 0;
+            int sel_to   = (char_idx >= end) ? (end - (char_idx - line_char_count)) : line_char_count;
 
-                int highlight_x = text_x + sel_from * char_width;
-                int highlight_w = (sel_to - sel_from) * char_width;
+            if (sel_to > sel_from)
+            {
+                int highlight_x = text_x + sel_from * FONT_WIDTH;
+                int highlight_w = (sel_to - sel_from) * FONT_WIDTH;
 
+                int highlight_y = draw_y + current_line * line_height;
+
+                // Clip the highlight rect to button area (important!)
+                // For simplicity we clip to framebuffer, but ideally also to b->x/b->y/b->w/b->h
                 draw_rect(fb, fb_width, fb_height,
                           highlight_x,
-                          draw_y + current_line * line_height,
+                          highlight_y,
                           highlight_w,
                           line_height,
-                          0x4080C0FF);   // nice blue selection color
+                          0x4080C0FF); // selection color
             }
         }
 
-        if (*p == '\n') {
+        if (*p == '\n')
+        {
             p++;
             current_line++;
             char_idx++;
-        } else if (*p) {
+            line_start_ptr = p;
+        }
+        else if (*p)
+        {
             p++;
             char_idx++;
         }
@@ -342,29 +253,35 @@ void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int f
 }
 
 // Draw line numbers
-void draw_line_numbers(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, int text_x, int draw_y) {
-    if (!b->editable_content) return; // only line numbers for mutable texts
+void draw_line_numbers(UI_Button* b, uint32_t* fb, int fb_width, int fb_height,
+                       int text_x, int draw_y)
+{
+    if (!b->editable_content) return;
 
     int line_height = b->line_height;
     int num_lines = 1;
-    for (const char* p = b->editable_content ; *p; p++) {
+    for (const char* p = b->editable_content; *p; p++) {
         if (*p == '\n') num_lines++;
     }
 
-    int line_num_x = b->x + 8;                    // left margin
+    int line_num_x = b->x + 8;
     int current_line = 1;
-
     char num_buf[16];
 
-    for (int i = 0; i < num_lines; i++) {
-        snprintf(num_buf, sizeof(num_buf), "%3d", current_line);
+    for (int i = 0; i < num_lines; i++)
+    {
+        int y_pos = draw_y + i * line_height;
 
-        draw_text(fb, fb_width, fb_height,
-                  num_buf,
-                  line_num_x,
-                  draw_y + i * line_height,
-                  0xFF888888, 1);   // gray line numbers
-
+        // Only draw if the line number is at least partially visible
+        if (y_pos + FONT_HEIGHT > 0 && y_pos < fb_height)
+        {
+            snprintf(num_buf, sizeof(num_buf), "%3d", current_line);
+            draw_text(fb, fb_width, fb_height,
+                      num_buf,
+                      line_num_x,
+                      y_pos,
+                      0xFF888888, 1);
+        }
         current_line++;
     }
 }

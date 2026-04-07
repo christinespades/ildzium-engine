@@ -1,4 +1,5 @@
 #include "ui_editor.h"
+#include "ui/ui_params.h"
 #include <GLFW/glfw3.h>
 #include <ctype.h>    // isalnum
 #include <stdlib.h>   // malloc, free
@@ -193,12 +194,12 @@ void paste_from_clipboard(UI_Button* b) {
 }
 
 // ====================== MOUSE TO CURSOR ======================
-
 int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y) {
     if (!b->content && !b->editable_content) return 0;
 
     int padding = 12;
     int text_x = b->x + padding;
+    if (b->is_editable) text_x += LINE_NUMBERS_WIDTH; // account for line numbers in editable text
     int text_y = b->y + padding;
 
     int rel_x = mouse_x - text_x;
@@ -208,6 +209,7 @@ int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y) {
     if (rel_y < 0) rel_y = 0;
 
     int line_height = b->line_height;
+    if (line_height <= 0) line_height = 1;
     int target_line = rel_y / line_height;
 
     // Find start of target line
@@ -224,8 +226,8 @@ int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y) {
     // Now walk horizontally on this line
     int x_pos = 0;
     while (*p && *p != '\n') {
-        if (x_pos + 8 > rel_x) break;   // 8 = char width (your font)
-        x_pos += 8;
+        if (x_pos + FONT_WIDTH > rel_x) break;   // 8 = char width (your font)
+        x_pos += FONT_WIDTH;
         p++;
         char_index++;
     }
