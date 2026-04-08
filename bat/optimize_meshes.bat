@@ -1,16 +1,16 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set "GLTFPACK=thirdparty\gltfpack.exe"
-set "MESH_DIR=meshes"
+set "GLTFPACK=..\thirdparty\gltfpack.exe"
+set "MESH_DIR=..\meshes"
 
 if not exist "%GLTFPACK%" (
     echo ERROR: gltfpack not found at "%GLTFPACK%"
     exit /b 1
 )
 
-echo === Optimizing GLB meshes ===
-echo Will generate *_opt.glb files in %MESH_DIR%
+:: echo === Optimizing GLB meshes ===
+:: echo Will generate *_opt.glb files in %MESH_DIR%
 echo.
 
 for %%F in ("%MESH_DIR%\*.glb") do (
@@ -21,9 +21,7 @@ for %%F in ("%MESH_DIR%\*.glb") do (
     echo !NAME!!EXT! | findstr /i "_opt.glb" >nul
     if errorlevel 1 (
         set "OUT=%%~dpnF_opt.glb"
-        if exist "!OUT!" (
-            echo Skipping already optimized: %%~nxF
-        ) else (
+        if not exist "!OUT!" (
             echo Optimizing: %%~nxF
             "%GLTFPACK%" -i "%%~fF" -o "!OUT!" -cf -tc -si 0.2 -noq -mm -mi
             if errorlevel 1 (
@@ -32,11 +30,9 @@ for %%F in ("%MESH_DIR%\*.glb") do (
             )
             echo   Created: !OUT!
         )
-    ) else (
-        echo Skipping optimized file: %%~nxF
     )
 )
 
 echo.
-echo === Mesh optimization complete ===
+:: echo === Mesh optimization complete ===
 endlocal

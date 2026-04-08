@@ -1,4 +1,23 @@
+#include "pch.h"
 #include "math.h"
+
+void matrix_identity(float* out)
+{
+    memset(out, 0, 16 * sizeof(float));
+    out[0] = out[5] = out[10] = out[15] = 1.0f;
+}
+
+void matrix_multiply(const float* a, const float* b, float* out)
+{
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            out[i*4 + j] = a[i*4 + 0] * b[0*4 + j] +
+                           a[i*4 + 1] * b[1*4 + j] +
+                           a[i*4 + 2] * b[2*4 + j] +
+                           a[i*4 + 3] * b[3*4 + j];
+        }
+    }
+}
 
 bool matrix_inverse(const float m[16], float invOut[16])
 {
@@ -67,8 +86,6 @@ bool matrix_inverse(const float m[16], float invOut[16])
 
     return true;
 }
-
-void matrix_identity(float m[16]);
 
 void matrix_scale(float m[16], float sx, float sy, float sz)
 {

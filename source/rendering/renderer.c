@@ -1,11 +1,6 @@
-#include <vulkan/vulkan.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <GLFW/glfw3.h>
-#include "scene/camera.h"
+#include "pch.h"
+#include "rendering/renderer.h"
 #include "rendering/device.h"
-#include "ui/ui.h"
 #include "ui/ui_renderer.h"
 #include "core/math.h"
 #include "core/memory.h"

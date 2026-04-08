@@ -1,6 +1,7 @@
-#include "lights.h"
+#include "pch.h"
+#include "scene/lights.h"
 
-void init_lights(VkDevice device,
+void init_lights(VkDevice dev,
                  VkPhysicalDevice phys)
 {
 	VkDescriptorSetLayoutBinding lightBinding = {0};
@@ -14,7 +15,7 @@ void init_lights(VkDevice device,
 	layoutInfo.bindingCount = 1;
 	layoutInfo.pBindings = &lightBinding;
 
-	vkCreateDescriptorSetLayout(device, &layoutInfo, NULL, &lightDescriptorSetLayout);
+	vkCreateDescriptorSetLayout(dev, &layoutInfo, NULL, &lightDescriptorSetLayout);
 
     VkDeviceSize size = sizeof(LightingUBO);
 
@@ -25,10 +26,10 @@ void init_lights(VkDevice device,
                   &g_lights.memory);
 
     // Persistent map
-    vkMapMemory(device, g_lights.memory, 0, size, 0, &g_lights.mapped);
+    vkMapMemory(dev, g_lights.memory, 0, size, 0, &g_lights.mapped);
 }
 
-void init_lights_write(VkDevice device)
+void init_lights_write(VkDevice dev)
 {
     // Descriptor write (binding 0)
     VkDescriptorBufferInfo bufInfo = {0};
@@ -45,7 +46,7 @@ void init_lights_write(VkDevice device)
     write.descriptorCount = 1;
     write.pBufferInfo = &bufInfo;
 
-    vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+    vkUpdateDescriptorSets(dev, 1, &write, 0, NULL);
 }
 
 void lights_update(VkCommandBuffer cmdBuf,

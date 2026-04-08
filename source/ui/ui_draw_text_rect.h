@@ -1,6 +1,7 @@
 #pragma once
-#include <stdint.h>
+#include "core/fonts.h"
 #include "ui/ui.h"
+#include "ui/ui_params.h"
 
 void draw_pixel(uint32_t* fb, int fb_w, int fb_h, int x, int y, uint32_t color);
 void draw_rect(uint32_t* fb, int fb_w, int fb_h, int x, int y, int w, int h, uint32_t color);

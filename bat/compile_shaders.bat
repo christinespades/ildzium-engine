@@ -1,12 +1,12 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo Compiling shaders...
+:: echo Compiling shaders...
 
-if not exist shaders mkdir shaders
+if not exist \..\shaders mkdir \..\shaders
 
 set GLSLC=%VULKAN_SDK%\Bin\glslc.exe
-set SHADER_DIR=%CD%\shaders
+set SHADER_DIR=%CD%\..\shaders
 
 if not exist "%GLSLC%" (
     echo ERROR: glslc.exe not found!
@@ -27,11 +27,9 @@ for %%F in ("%SHADER_DIR%\*.vert" "%SHADER_DIR%\*.frag") do (
             if %%~tA GTR %%~tB (
                 echo Recompiling %%~nxF...
                 "%GLSLC%" "!INPUT!" -o "!OUTPUT!"
-            ) else (
-                echo %%~nxF is up to date.
             )
         )
     )
 )
 
-echo Shader compilation done.
+:: echo Shader compilation done.

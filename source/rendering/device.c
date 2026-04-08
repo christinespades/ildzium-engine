@@ -1,8 +1,6 @@
+#include "pch.h"
 #include "device.h"
-#include <stdio.h>
-#include <stdlib.h>
 
-// Globals
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 VkDevice device = VK_NULL_HANDLE;
 VkQueue graphicsQueue = VK_NULL_HANDLE;

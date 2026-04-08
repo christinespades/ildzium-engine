@@ -1,8 +1,5 @@
-#include <stdio.h>    // FILE, fopen, fread, fseek, ftell, fclose, printf
-#include <stdlib.h>   // malloc, free, exit, NULL
-#include <stdint.h>   // uint32_t
-#include <vulkan/vulkan.h>
-#include "rendering/renderer.h"
+#include "pch.h"
+#include "core/memory.h"
 
 extern VkPhysicalDevice physicalDevice;
 

@@ -1,5 +1,7 @@
+#include "pch.h"
 #include "ui_skybox.h"
 #include "ui/ui_elements.h"
+#include "ui/ui_params.h"
 #include "scene/sky.h"
 #include "core/io.h"
 
@@ -77,7 +79,7 @@ void setup_skybox_controls(UI_Context* ctx)
     char* shader_src = load_file("../../shaders/sky.frag");
     ui_add_scrollable_text_editor(ctx,
         900, 70,               // x, y  (adjust to your resolution)
-        1200, 1400,              // width, height
+        EDITOR_WIDTH, EDITOR_HEIGHT,
         shader_src,
         "../../shaders/sky.frag");
 

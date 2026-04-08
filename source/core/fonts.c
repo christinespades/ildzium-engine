@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "fonts.h"
 
 uint8_t font8x8_basic[250][8] = {

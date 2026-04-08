@@ -1,7 +1,4 @@
 #pragma once
-#include <threads.h>        // C11 threads
-#include <stdbool.h>
-#include <windows.h>
 
 // Max number of directories we can watch simultaneously
 #define MAX_WATCHED_DIRS 16

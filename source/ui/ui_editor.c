@@ -1,10 +1,5 @@
+#include "pch.h"
 #include "ui_editor.h"
-#include "ui/ui_params.h"
-#include "ui/ui_editor_undo.h"
-#include <GLFW/glfw3.h>
-#include <ctype.h>    // isalnum
-#include <stdlib.h>   // malloc, free
-#include <string.h>   // strlen, strcpy
 
 extern GLFWwindow* g_window; 
 

@@ -1,15 +1,6 @@
-#include "core/debug.h"
+#include "pch.h"
 #include "ui/ui_draw.h"
-#include "ui/ui_draw_info.h"
-#include "ui/ui_draw_text_rect.h"
-#include "ui/ui.h"
-#include "ui/ui_params.h"
-#include <math.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
 
-// ====================== DRAW HELPERS ======================
 void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float dt)
 {
     if (!b->is_editable || !b->editable_content || b->editable_content[0] == '\0')
@@ -97,23 +88,6 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
                       COLOR_EDITOR_CARET);
         }
     }
-}
-
-void draw_scrollbar(UI_Button* b, uint32_t* fb, int fb_width, int fb_height) {
-    if (!b->is_scrollable || b->content_height <= b->h) return;
-
-    int padding = 12;
-    float visible_height = (float)(b->h - 2 * padding);
-    float scroll_ratio = visible_height / b->content_height;
-    float thumb_height = fmaxf(30.0f, visible_height * scroll_ratio);
-    float max_scroll = fmaxf(0.0f, b->content_height - visible_height);
-    float progress = (max_scroll > 0) ? (b->scroll_offset / max_scroll) : 0.0f;
-
-    int scrollbar_x = b->x + b->w - 14;
-    int scrollbar_y = b->y + padding + (int)(progress * (visible_height - thumb_height));
-
-    draw_rect(fb, fb_width, fb_height, scrollbar_x, b->y + padding, 8, (int)visible_height, COLOR_SCROLLBAR_BG);
-    draw_rect(fb, fb_width, fb_height, scrollbar_x, scrollbar_y, 8, (int)thumb_height, COLOR_SCROLLBAR_THUMB);
 }
 
 void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float dt)

@@ -1,9 +1,5 @@
-#include "core/debug.h"
+#include "pch.h"
 #include "ui/ui_elements.h"
-#include "ui/ui_params.h"
-#include "ui/ui_editor.h"
-#include <stdlib.h>   // malloc, free
-#include <string.h>   // strlen, strcpy
 
 int g_line_height; // used for editable text
 

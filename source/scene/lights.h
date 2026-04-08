@@ -1,8 +1,6 @@
 #pragma once
 #include "core/memory.h"
 #include "scene/model.h"
-#include <stdint.h>
-#include <string.h>
 
 // 16-byte aligned vec3 to perfectly match GLSL std140 (prevents alignment bugs)
 typedef struct {

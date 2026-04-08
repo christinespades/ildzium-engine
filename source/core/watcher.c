@@ -1,8 +1,6 @@
+#include "pch.h"
 #include "watcher.h"
 #include "rendering/shaders.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 extern void on_shader_changed(const char* path);
 

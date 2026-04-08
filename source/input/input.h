@@ -1,5 +1,4 @@
 #pragma once
-#include <GLFW/glfw3.h>
 
 int mouse_wheel;
 void init_input();

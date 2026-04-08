@@ -1,5 +1,7 @@
 #pragma once
 #include "ui.h"
+#include "ui/ui_params.h"
+#include "ui/ui_editor_undo.h"
 
 void ensure_capacity(UI_Button* b, size_t needed);
 void insert_char_at_cursor(UI_Button* b, char c);

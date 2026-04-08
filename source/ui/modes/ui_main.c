@@ -1,11 +1,5 @@
+#include "pch.h"
 #include "ui_main.h"
-#include <curl/curl.h>
-#include <stdlib.h>
-#include <string.h>
-#include "ui/ui.h"
-#include "ui/ui_elements.h"
-#include "ui/ui_params.h"
-#include <GLFW/glfw3.h>
 
 extern GLFWwindow* g_window;
 

@@ -1,8 +1,11 @@
 #pragma once
+#include "core/debug.h"
 #include "ui/ui.h"
+#include "ui/ui_callbacks.h"
+#include "ui/ui_params.h"
+#include "ui/ui_editor.h"
 
-#define MAX_BUTTONS 64
-
+typedef void (*UI_ButtonCallback)(void);
 void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text,
                    UI_ButtonCallback on_click,
                    UI_ButtonCallback on_held,

@@ -1,11 +1,8 @@
-#include "surface.h"
-#include <stdio.h>    // FILE, fopen, fread, fseek, ftell, fclose, printf
-#include <stdlib.h>   // malloc, free, exit, NULL
-#include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include "pch.h"
+#include "rendering/surface.h"
+#include "input/input.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "input/input.h"
 
 GLFWwindow* g_window = NULL;
 VkInstance vk_instance = VK_NULL_HANDLE;

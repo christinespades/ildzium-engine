@@ -1,22 +1,12 @@
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#include <vulkan/vulkan.h>
-#include <stdio.h>
-#include <stdlib.h>
-
+#include "pch.h"
+#include "main.h"
 #include "core/debug.h"
 #include "scene/camera.h"
 #include "input/input.h"
-#include "main.h"
 #include "ui/ui.h"
 #include "scene/model.h"
 #include "rendering/surface.h"
 #include "core/watcher.h"
-
-#include <dbghelp.h>
-#include <crtdbg.h>
 
 #pragma comment(lib, "dbghelp.lib")
 

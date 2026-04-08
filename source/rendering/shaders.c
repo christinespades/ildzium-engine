@@ -1,7 +1,4 @@
-#include <stdio.h>    // FILE, fopen, fread, fseek, ftell, fclose, printf
-#include <stdlib.h>   // malloc, free, exit, NULL
-#include <stdint.h>   // uint32_t
-#include <string.h>
+#include "pch.h"
 #include "scene/model.h"
 #include "scene/sky.h"
 #include "ui/ui.h"

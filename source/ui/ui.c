@@ -1,16 +1,5 @@
+#include "pch.h"
 #include "ui/ui.h"
-#include <GLFW/glfw3.h>
-#include <math.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include "core/events.h"
-#include "core/settings.h"
-#include "scene/sky.h"
-#include "ui_callbacks.h"
-#include "ui/ui_editor.h"
-#include "ui/ui_elements.h"
-#include "ui/modes/ui_modes.h"
 
 static float hold_accumulator = 0.0f;
 extern void setup_camera_controls(UI_Context* ctx);
@@ -181,16 +170,6 @@ void ui_button_mouse_up(UI_Button* b)
     b->is_dragging = false;
 }
 
-/*
-something weird. the selection highlight appears transparent not black, but i like it, but it masks the text so it cant be read, i thought the text would be visible on top? and the selection rect flickers, sometimes just a single click on a world selects the whole line, other times it just selects the word. however the shift + select works perfectly, flawlessly, selecting multiple lines etc, no flickering there
-
-
-fps bar 
-
-wrap text properly
-
-
-*/
 void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt)
 {
     if (!ctx->cursor_captured) return;

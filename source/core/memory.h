@@ -1,5 +1,5 @@
 #pragma once
-#include <vulkan/vulkan.h>
+#include "rendering/renderer.h"
 
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,

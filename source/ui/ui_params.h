@@ -21,11 +21,14 @@
 #define COLOR_TUNER_SPLIT_LINE COLOR_RED_70
 #define COLOR_TUNER_VALUE_TEXT COLOR_WHITE
 
-static const float BOTTOM_INFO_PANEL_AUTOSCROLL_SPEED = 60.0f;  // pixels per second (auto-scroll)
+static const float BOTTOM_INFO_PANEL_AUTOSCROLL_SPEED = 30.0f;  // pixels per second (auto-scroll)
 
 #define UI_CONTAINER_PADDING 70 // used for the main box inside each ui_ctx
 
+#define EDITOR_HEIGHT 1400
 #define EDITOR_LINE_NUMBERS_WIDTH 50
 #define EDITOR_UNDO_HISTORY_AMOUNT 512
+#define EDITOR_WIDTH 800
 #define FONT_WIDTH   8
 #define FONT_HEIGHT  8
+#define MAX_BUTTONS 64

@@ -1,10 +1,5 @@
-#include <math.h>
-#include <string.h>
-
+#include "pch.h"
 #include "scene/camera.h"
-#include "core/math.h"
-#include "rendering/renderer.h"
-#include "ui/ui.h"
 
 Camera camera = {0.0f, 0.0f, 5.0f, -90.0f, 0.0f, 15.0f};
 
@@ -18,24 +13,6 @@ void init_camera(void)
     camera.yaw = -90.0f;
     camera.pitch = 0.0f;
     camera.speed = 15.0f;
-}
-
-void matrix_identity(float* out)
-{
-    memset(out, 0, 16 * sizeof(float));
-    out[0] = out[5] = out[10] = out[15] = 1.0f;
-}
-
-void matrix_multiply(const float* a, const float* b, float* out)
-{
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            out[i*4 + j] = a[i*4 + 0] * b[0*4 + j] +
-                           a[i*4 + 1] * b[1*4 + j] +
-                           a[i*4 + 2] * b[2*4 + j] +
-                           a[i*4 + 3] * b[3*4 + j];
-        }
-    }
 }
 
 // Simple look-at style view matrix from camera position + yaw/pitch
@@ -79,8 +56,8 @@ void camera_get_view_matrix(float* out_view)
 void camera_get_projection_matrix(float* out_proj, float aspect_ratio)
 {
     float fov = 60.0f * (PI / 180.0f);   // 60 degrees
-    float near = 0.1f;
-    float far  = 1000.0f;
+    float nearPlane = 0.1f;
+    float farPlane  = 1000.0f;
 
     float f = 1.0f / tanf(fov / 2.0f);
 
@@ -88,9 +65,9 @@ void camera_get_projection_matrix(float* out_proj, float aspect_ratio)
 
     out_proj[0]  = f / aspect_ratio;
     out_proj[5]  = f;
-    out_proj[10] = (far + near) / (near - far);
+    out_proj[10] = (farPlane + nearPlane) / (nearPlane - farPlane);
     out_proj[11] = -1.0f;
-    out_proj[14] = (2.0f * far * near) / (near - far);
+    out_proj[14] = (2.0f * farPlane * nearPlane) / (nearPlane - farPlane);
     out_proj[15] = 0.0f;
 }
 
@@ -126,7 +103,6 @@ void update_camera(float deltaTime)
     if (glfwGetKey(g_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         camera.y -= velocity;
 }
-
 
 void update_camera_ubo(void)
 {

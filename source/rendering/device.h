@@ -1,5 +1,4 @@
 #pragma once
-#include <vulkan/vulkan.h>
 
 extern VkPhysicalDevice physicalDevice;
 extern VkDevice device;

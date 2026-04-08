@@ -1,18 +1,16 @@
-#define CGLTF_IMPLEMENTATION
-#define CGLTF_MESHOPT_DECODE 1
-#define MESHOPTIMIZER_IMPLEMENTATION
-#include "cgltf.h"
+#include "pch.h"
 #include "scene/lights.h"
 #include "scene/model.h"
 #include "core/math.h"
 #include "rendering/renderer.h" 
 #include "rendering/shaders.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#define CGLTF_IMPLEMENTATION
+#define CGLTF_MESHOPT_DECODE 1
+#define MESHOPTIMIZER_IMPLEMENTATION
+#include "cgltf.h"
 
 extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-extern VkDevice device;                     // needed because renderer.h may not expose it directly
+extern VkDevice device;
 extern VkPipeline modelPipeline;
 extern VkPipelineLayout modelPipelineLayout;
 extern VkDescriptorSet modelDescriptorSet;

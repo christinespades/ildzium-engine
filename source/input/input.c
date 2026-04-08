@@ -1,7 +1,7 @@
-#include <GLFW/glfw3.h>
+#include "pch.h"
+#include "input.h"
 #include "core/io.h"
 #include "scene/camera.h"
-#include "input.h"
 #include "ui/ui.h"
 #include "ui/ui_editor.h"
 

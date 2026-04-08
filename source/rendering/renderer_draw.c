@@ -1,5 +1,4 @@
-#include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include "pch.h"
 #include "rendering/device.h"
 #include "rendering/renderer_draw.h"
 #include "scene/camera.h"

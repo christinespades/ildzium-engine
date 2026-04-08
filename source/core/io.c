@@ -1,7 +1,5 @@
+#include "pch.h"
 #include "io.h"
-#include <stdio.h>    // FILE, fopen, fclose, fread, fseek, ftell, SEEK_END, SEEK_SET
-#include <stdlib.h>   // malloc, free
-#include <string.h>   // strlen, strcpy
 
 char* load_file(const char* path)
 {

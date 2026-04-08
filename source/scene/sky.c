@@ -1,12 +1,8 @@
+#include "pch.h"
 #include "scene/sky.h"
 #include "scene/camera.h"
 #include "rendering/shaders.h"   // assumes load_spirv is here
 #include "ui/ui.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <vulkan/vulkan.h>
-#include <math.h>
 
 SkyParameters g_skyParams = {
     .timeOfDay = 0.3f,          // start a bit after sunrise

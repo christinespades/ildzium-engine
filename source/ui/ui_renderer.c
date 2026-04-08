@@ -1,9 +1,5 @@
-#include "core/memory.h"
-#include "rendering/renderer.h"
-#include "rendering/shaders.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "pch.h"
+#include "ui/ui_renderer.h"
 
 extern VkDevice device;
 extern VkPhysicalDevice physicalDevice;
