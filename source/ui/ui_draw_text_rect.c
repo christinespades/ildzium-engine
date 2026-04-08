@@ -50,14 +50,22 @@ void draw_char(uint32_t* fb, int fb_w, int fb_h, char c, int x, int y, uint32_t 
 
 void draw_text(uint32_t* fb, int fb_w, int fb_h,
                const char* text, int x, int y,
-               uint32_t color, int scale)
+               uint32_t normal_color, int scale,
+               UI_Button* b)
 {
     if (!text || y >= fb_h || x >= fb_w) return;
+
+    bool has_selection = (b && b->is_editable && b->selection_start != -1);
+    int sel_start = has_selection ? 
+        (b->selection_start < b->selection_end ? b->selection_start : b->selection_end) : -1;
+    int sel_end   = has_selection ? 
+        (b->selection_start > b->selection_end ? b->selection_start : b->selection_end) : -1;
 
     int cursor_x = x;
     int cursor_y = y;
     int char_w = FONT_WIDTH * scale;
     int char_h = FONT_HEIGHT * scale;
+    int global_char_idx = 0;
 
     while (*text)
     {
@@ -66,29 +74,36 @@ void draw_text(uint32_t* fb, int fb_w, int fb_h,
             cursor_y += FONT_HEIGHT * scale;
             cursor_x = x;
             text++;
-            // Early exit if we've scrolled past the bottom of the screen
+            global_char_idx++;
             if (cursor_y >= fb_h) break;
             continue;
         }
 
-        // Simple clipping for this character
+        uint32_t draw_color = normal_color;
+
+        // Selected text = white
+        if (has_selection && global_char_idx >= sel_start && global_char_idx < sel_end)
+        {
+            draw_color = COLOR_SELECTED_TEXT;
+        }
+
         if (cursor_x + char_w > 0 && cursor_y + char_h > 0 &&
             cursor_x < fb_w && cursor_y < fb_h)
         {
-            draw_char(fb, fb_w, fb_h, *text, cursor_x, cursor_y, color, scale);
+            draw_char(fb, fb_w, fb_h, *text, cursor_x, cursor_y, draw_color, scale);
         }
 
         cursor_x += char_w;
-        // Optional: stop if we've gone way off the right edge
         if (cursor_x > fb_w) break;
 
         text++;
+        global_char_idx++;
     }
 }
 
 void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
                          int x, int y, const char* text,
-                         uint32_t color, int base_scale, int line_height)
+                         uint32_t color, int base_scale, int line_height, UI_Button* b)
 {
     if (!text || !*text) return;
 
@@ -132,7 +147,7 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
                           x + offset_x,
                           current_y,
                           color,
-                          draw_scale);
+                          draw_scale, b);
             }
         }
 

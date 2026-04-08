@@ -182,10 +182,14 @@ void ui_button_mouse_up(UI_Button* b)
 }
 
 /*
-something weird. the selection highlight still appears transparent, but masks the text so it cant be read, and it flickers, sometimes just a single click on a world selects the whole line, other times it just selects the word. 
+something weird. the selection highlight appears transparent not black, but i like it, but it masks the text so it cant be read, i thought the text would be visible on top? and the selection rect flickers, sometimes just a single click on a world selects the whole line, other times it just selects the word. however the shift + select works perfectly, flawlessly, selecting multiple lines etc, no flickering there
 
 
 fps bar 
+
+wrap text properly
+
+
 */
 void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt)
 {
@@ -209,62 +213,78 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
         // ==================== EDITOR MOUSE HANDLING ====================
         if (b->is_editable && is_hover) {
 
-            // Left click - set cursor / start selection
-            if (is_pressed) {
-                double now = glfwGetTime();
-                int pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
+            int pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
 
+            if (is_pressed) {   // mouse button is down this frame
+                double now = glfwGetTime();
                 b->is_dragging = true;
                 b->drag_start_pos = pos;
 
+                // === SHIFT + CLICK / DRAG ===
                 if (glfwGetKey(g_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
                     glfwGetKey(g_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
                 {
-                    // Extend existing selection
                     if (b->selection_start == -1)
                         b->selection_start = b->cursor_pos;
 
-                    int new_pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
-                    b->selection_end = new_pos;
-                    b->cursor_pos = new_pos;
-                    return;
-                }
-
-                // Detect double / triple click
-                if (now - b->last_click_time < 0.35 && pos == b->last_click_pos)   // 350ms threshold
-                {
-                    b->click_count++;
-                }
-                else
-                {
-                    b->click_count = 1;
-                }
-
-                b->last_click_time = now;
-                b->last_click_pos = pos;
-
-                if (b->click_count == 1)
-                {
-                    // Single click: just move caret, clear selection
+                    b->selection_end = pos;
                     b->cursor_pos = pos;
-                    b->selection_start = b->selection_end = -1;
                 }
-                else if (b->click_count == 2)
+                // === Normal click / double / triple click ===
+                else if (!b->is_dragging || /* first press */ !ctx->button_held_last_frame[i])
                 {
-                    // Double click: select word
-                    select_word_at_position(b, pos);
-                    b->cursor_pos = b->selection_end;
+                    // Only count clicks on the initial press, not while holding
+                    if (now - b->last_click_time < 0.35 && pos == b->last_click_pos)
+                    {
+                        b->click_count++;
+                    }
+                    else
+                    {
+                        b->click_count = 1;
+                    }
+
+                    b->last_click_time = now;
+                    b->last_click_pos = pos;
+
+                    if (b->click_count == 1)
+                    {
+                        // Single click: move caret, clear selection
+                        b->cursor_pos = pos;
+                        b->selection_start = b->selection_end = -1;
+                    }
+                    else if (b->click_count == 2)
+                    {
+                        // Double click: select word
+                        select_word_at_position(b, pos);
+                        b->cursor_pos = b->selection_end;
+                    }
+                    else if (b->click_count >= 3)
+                    {
+                        // Triple click: select entire line
+                        select_entire_line(b, pos);
+                        b->click_count = 0;
+                    }
                 }
-                else if (b->click_count >= 3)
+                // While dragging (button held) after single click → update selection
+                else if (b->click_count == 1 && b->is_dragging)
                 {
-                    // Triple click: select entire line
-                    select_entire_line(b, pos);
-                    b->click_count = 0; // reset so quadruple doesn't do weird things
+                    b->selection_start = b->drag_start_pos;
+                    b->selection_end = pos;
+                    b->cursor_pos = pos;
                 }
 
-                b->content_height = 0.0f; // invalidate layout if needed
+                b->content_height = 0.0f;
             }
-            return;
+            else {
+                // Mouse button released
+                if (b->is_dragging) {
+                    ui_button_mouse_up(b);   // your existing function that sets is_dragging = false
+                }
+            }
+
+            // Important: Do NOT return here for editable buttons!
+            // We still want to run the general button logic below if needed
+            // Only skip if you have a good reason
         }
 
         // === TUNING LOGIC (while held) ===

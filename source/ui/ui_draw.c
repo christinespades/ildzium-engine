@@ -40,7 +40,7 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
 
     const char* text = b->editable_content;
     int padding = 12;
-    int text_x = b->x + padding + LINE_NUMBERS_WIDTH;   // make sure LINE_NUMBERS_WIDTH is defined
+    int text_x = b->x + padding + EDITOR_LINE_NUMBERS_WIDTH;
     int text_y_base = b->y + padding;
 
     // Clamp scroll offset
@@ -51,23 +51,23 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
     int draw_y = text_y_base - (int)b->scroll_offset;
 
     // 1. Line Numbers
-    draw_line_numbers(b, fb, fb_width, fb_height, text_x - LINE_NUMBERS_WIDTH, draw_y);
+    draw_line_numbers(b, fb, fb_width, fb_height, text_x - EDITOR_LINE_NUMBERS_WIDTH, draw_y);
 
-    // 2. Main text
-    draw_multiline_text(fb, fb_width, fb_height,
-                        text_x, draw_y,
-                        text, 0xFFFFFFFF, 1, b->line_height);
-
-    // 3. Selection Highlighting
+    // Selection Highlighting
     if (b->selection_start != -1)
         draw_selection_highlighting(b, fb, fb_width, fb_height, text_x, draw_y);
 
-    // 4. Blinking Cursor
+    // Main text
+    draw_multiline_text(fb, fb_width, fb_height,
+                        text_x, draw_y,
+                        text, COLOR_EDITOR_MAIN_TEXT, 1, b->line_height, b);
+
+    // 4. Blinking Caret
     static float blink_timer = 0.0f;
     blink_timer += dt;
     if (((int)(blink_timer * 3.0f) % 2) == 0)
     {
-        // Calculate cursor line and column safely
+        // Calculate caret line and column safely
         int cursor_line = 0;
         int cursor_col = 0;
         int idx = 0;
@@ -88,13 +88,13 @@ void draw_editor(UI_Button* b, uint32_t* fb, int fb_width, int fb_height, float 
         int cursor_screen_x = text_x + cursor_col * FONT_WIDTH;
         int cursor_screen_y = draw_y + cursor_line * b->line_height;
 
-        // Extra safety: only draw cursor if it's inside the button area
+        // Extra safety: only draw caret if it's inside the button area
         if (cursor_screen_y + b->line_height > b->y && cursor_screen_y < b->y + b->h)
         {
             draw_rect(fb, fb_width, fb_height,
                       cursor_screen_x, cursor_screen_y,
                       2, b->line_height,
-                      0xFFFFAA00);
+                      COLOR_EDITOR_CARET);
         }
     }
 }
@@ -112,8 +112,8 @@ void draw_scrollbar(UI_Button* b, uint32_t* fb, int fb_width, int fb_height) {
     int scrollbar_x = b->x + b->w - 14;
     int scrollbar_y = b->y + padding + (int)(progress * (visible_height - thumb_height));
 
-    draw_rect(fb, fb_width, fb_height, scrollbar_x, b->y + padding, 8, (int)visible_height, 0x30FFFFFF);
-    draw_rect(fb, fb_width, fb_height, scrollbar_x, scrollbar_y, 8, (int)thumb_height, 0xCCFFFFFF);
+    draw_rect(fb, fb_width, fb_height, scrollbar_x, b->y + padding, 8, (int)visible_height, COLOR_SCROLLBAR_BG);
+    draw_rect(fb, fb_width, fb_height, scrollbar_x, scrollbar_y, 8, (int)thumb_height, COLOR_SCROLLBAR_THUMB);
 }
 
 void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float dt)
@@ -128,11 +128,11 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
 
         // Background
         uint32_t panel_color = (b->target_value && ctx->button_held_last_frame[i])
-                               ? 0xFF555555 : 0xB4000000;
+                               ? COLOR_TUNER_PANEL_ACTIVE : COLOR_TUNER_PANEL_IDLE;
         draw_rect(fb, fb_width, fb_height, b->x, b->y, b->w, b->h, panel_color);
 
         // Borders
-        uint32_t border = 0x80FFFFFF;
+        uint32_t border = COLOR_BORDER;
         draw_rect(fb, fb_width, fb_height, b->x, b->y, b->w, 2, border);
         draw_rect(fb, fb_width, fb_height, b->x, b->y + b->h - 2, b->w, 2, border);
         draw_rect(fb, fb_width, fb_height, b->x, b->y, 2, b->h, border);
@@ -141,7 +141,7 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
         // Tuner split line
         if (b->target_value) {
             int mid = b->x + b->w / 2;
-            draw_rect(fb, fb_width, fb_height, mid, b->y + 4, 2, b->h - 8, 0x00000000);
+            draw_rect(fb, fb_width, fb_height, mid, b->y + 4, 2, b->h - 8, COLOR_TUNER_SPLIT_LINE);
 
             // Current value
             char val[32];
@@ -149,7 +149,7 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
             float value = *b->target_value; 
             snprintf(val, sizeof(val), "%.3f", value);
             draw_text(fb, fb_width, fb_height, val, 
-                      b->x + 20, b->y + b->h - 16, 0xFFFFAA00, 2);
+                      b->x + 20, b->y + b->h - 16, COLOR_TUNER_VALUE_TEXT, 2, b);
         }
 
         // Draw editor if it's an editable text area
@@ -169,14 +169,14 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
                 // Draw with scroll offset
                 draw_multiline_text(fb, fb_width, fb_height,
                                     tx, ty - (int)b->scroll_offset,
-                                    b->content, 0xFFFFFFFF, scale, line_h);
+                                    b->content, COLOR_MAIN_TEXT, scale, line_h, b);
                 draw_scrollbar(b, fb, fb_width, fb_height);
             } 
             else {
                 // Normal non-scrollable button text
                 draw_multiline_text(fb, fb_width, fb_height,
                                     tx, ty, b->content,
-                                    0xFFFFFFFF, scale, line_h);
+                                    COLOR_MAIN_TEXT, scale, line_h, b);
             }
         }
     }
@@ -188,69 +188,61 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
 // Draw accurate per-line selection highlighting
 // For both read-only text (content) and mutable text (editable_content)
 // Draw accurate per-character selection highlighting (black)
+// Corrected: draws the highlight exactly where the selected characters are (not at line start)
+// FIXED: Highlights exactly the selected range (word, multiple words, lines, etc.)
 void draw_selection_highlighting(UI_Button* b, uint32_t* fb, int fb_width, int fb_height,
                                  int text_x, int draw_y)
 {
-    const char* p = b->is_editable ? b->editable_content : b->content;
-    if (b->selection_start == -1 || !p) return;
+    const char* text = b->is_editable ? b->editable_content : b->content;
+    if (b->selection_start == -1 || !text) return;
 
-    int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
-    int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
-    if (start == end) return;
+    int sel_start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
+    int sel_end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
+    if (sel_start == sel_end) return;
 
-    int line_height = b->line_height;
-    if (line_height <= 0) line_height = FONT_HEIGHT + 4; // fallback
+    int line_height = b->line_height > 0 ? b->line_height : (FONT_HEIGHT + 4);
 
     int current_line = 0;
     int char_idx = 0;
-    const char* line_start = p;
+    const char* p = text;
 
-    while (*p && char_idx < end)
+    while (*p && char_idx < sel_end)
     {
-        if (char_idx >= start)
+        int line_start_idx = char_idx;   // remember where this line begins
+
+        // Skip to end of line or end of selection
+        while (*p && *p != '\n' && char_idx < sel_end)
         {
-            // Find how many characters are selected on this line
-            int line_sel_start = (start > char_idx) ? (start - char_idx) : 0;
-            int line_sel_end = 0;
-
-            const char* q = p;
-            int temp_idx = char_idx;
-            while (*q && *q != '\n' && temp_idx < end)
+            if (char_idx >= sel_start)
             {
-                q++;
-                temp_idx++;
-                line_sel_end++;
+                // We are inside the selection on this line
+                int from = (sel_start > line_start_idx) ? (sel_start - line_start_idx) : 0;
+                int to   = (sel_end   > char_idx)      ? (char_idx - line_start_idx + 1) : (char_idx - line_start_idx);
+
+                // Only draw if there's something to highlight on this line
+                if (to > from)
+                {
+                    int highlight_x = text_x + from * FONT_WIDTH;
+                    int highlight_w = (to - from) * FONT_WIDTH;
+                    int highlight_y = draw_y + current_line * line_height;
+
+                    draw_rect(fb, fb_width, fb_height,
+                              highlight_x, highlight_y,
+                              highlight_w, line_height,
+                              COLOR_TEXT_HIGHLIGHT);
+                }
             }
 
-            int sel_from = line_sel_start;
-            int sel_to   = (temp_idx >= end) ? (end - char_idx) : line_sel_end;
-
-            if (sel_to > sel_from)
-            {
-                int highlight_x = text_x + sel_from * FONT_WIDTH;
-                int highlight_w = (sel_to - sel_from) * FONT_WIDTH;
-                int highlight_y = draw_y + current_line * line_height;
-
-                // Black selection with good opacity (text stays readable)
-                draw_rect(fb, fb_width, fb_height,
-                          highlight_x, highlight_y,
-                          highlight_w, line_height,
-                          0x000000CC);   // <-- changed to black
-            }
+            p++;
+            char_idx++;
         }
 
-        // Advance to next line
+        // Handle newline
         if (*p == '\n')
         {
             p++;
             char_idx++;
             current_line++;
-            line_start = p;
-        }
-        else if (*p)
-        {
-            p++;
-            char_idx++;
         }
     }
 }
@@ -283,7 +275,7 @@ void draw_line_numbers(UI_Button* b, uint32_t* fb, int fb_width, int fb_height,
                       num_buf,
                       line_num_x,
                       y_pos,
-                      0xFF888888, 1);
+                      COLOR_EDITOR_LINE_NUMBERS, 1, b);
         }
         current_line++;
     }

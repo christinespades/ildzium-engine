@@ -24,7 +24,6 @@ void cleanup_editor_undo(UI_Button* b) {
     }
 }
 
-
 void copy_editor_state(EditorState* dst, const UI_Button* b) {
     if (!b->editable_content) {
         dst->text = NULL;

@@ -210,7 +210,7 @@ int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y)
 
     int padding = 12;
     int text_x = b->x + padding;
-    if (b->is_editable) text_x += LINE_NUMBERS_WIDTH;
+    if (b->is_editable) text_x += EDITOR_LINE_NUMBERS_WIDTH;
 
     int text_y = b->y + padding;
     int rel_x = mouse_x - text_x;

@@ -6,9 +6,7 @@
 #include "ui/ui_draw_text_rect.h"
 #include "ui/ui_params.h"
 
-// Add this global or to your UI_Context if you prefer
 static float info_scroll_x = 0.0f;   // persistent horizontal scroll offset
-static const float SCROLL_SPEED = 60.0f;  // pixels per second (auto-scroll)
 
 // ====================== TEXT WIDTH HELPER ======================
 // Simple monospaced font width calculation (assumes your font is fixed-width)
@@ -63,11 +61,11 @@ void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
     // === Panel setup ===
     const int panel_height = 32;
     const int panel_y      = fb_height - panel_height;
-    const int padding      = 10;
+    const int padding      = 20;
 
     ui_draw_panel(fb, fb_width, fb_height,
                   0, panel_y, fb_width, panel_height,
-                  0xD0000000, 0xA0FFFFFF);   // darker bg + nicer border
+                  COLOR_BOTTOM_INFO_PANEL_BG, COLOR_BOTTOM_INFO_PANEL_BORDER);
 
     // === Horizontal scrolling text ===
     int text_y = panel_y + (panel_height - FONT_HEIGHT) / 2;
@@ -77,30 +75,18 @@ void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
 
     int text_pixel_width = get_text_width(info_text, 1);  // scale = 1
 
-    if (text_pixel_width > available_width)
-    {
-        // Auto-scroll logic
-        info_scroll_x += SCROLL_SPEED * dt;
+    // Auto-scroll logic
+    info_scroll_x += BOTTOM_INFO_PANEL_AUTOSCROLL_SPEED * dt;
 
-        // Loop the scroll (seamless)
-        if (info_scroll_x > text_pixel_width + 50)   // extra gap
-            info_scroll_x = -100.0f;                 // start from left with small gap
+    // Loop the scroll (seamless)
+    if (info_scroll_x > text_pixel_width + 50)   // extra gap
+        info_scroll_x = -100.0f;                 // start from left with small gap
 
-        // Draw with horizontal offset (clipped by draw function)
-        draw_text_hscroll(fb, fb_width, fb_height,
-                          info_text,
-                          padding, text_y,
-                          0xFFFFFFFF, 1,
-                          (int)info_scroll_x,
-                          available_width);
-    }
-    else
-    {
-        // No need to scroll → just draw normally and reset offset
-        info_scroll_x = 0.0f;
-        draw_text(fb, fb_width, fb_height,
-                  info_text,
-                  padding, text_y,
-                  0xFFFFFFFF, 1);
-    }
+    // Draw with horizontal offset (clipped by draw function)
+    draw_text_hscroll(fb, fb_width, fb_height,
+                      info_text,
+                      padding, text_y,
+                      COLOR_BOTTOM_INFO_PANEL_TEXT, 1,
+                      (int)info_scroll_x,
+                      available_width);
 }
