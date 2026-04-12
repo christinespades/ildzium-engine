@@ -5,9 +5,7 @@
 #include "ui/ui_params.h"
 
 void free_editor_state(EditorState* s);
-
-// must be called when button is destroyed
-void cleanup_editor_undo(UI_Button* b);
+void cleanup_editor_undo(UI_Button* b); // must be called when button is destroyed
 void copy_editor_state(EditorState* dst, const UI_Button* b);
 void push_undo_state(UI_Button* b);
 void restore_state(UI_Button* b, EditorState* s);

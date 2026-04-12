@@ -1,9 +1,12 @@
 #pragma once
+#include "core/http.h"
+#include "core/string.h"
+#include "core/parser_md.h"
 #include "ui/ui.h"
 #include "ui/ui_elements.h"
 #include "ui/ui_params.h"
 #include "ui/ui_draw.h"
+#include "ui/ui_markdown.h"
 
-static size_t write_to_string(void *ptr, size_t size, size_t nmemb, void *userp);
-char* fetch_readme(const char* url);
+static void on_readme_loaded(char* readme, void* user);
 void setup_main_controls(UI_Context* ctx);

@@ -1,6 +1,8 @@
 #pragma once
 #include "core/math.h"
+#include "input/input.h"
 #include "rendering/renderer.h"
+#include "rendering/surface.h"
 #include "ui/ui.h"
 
 typedef struct {
@@ -10,7 +12,14 @@ typedef struct {
 } Camera;
 
 extern Camera camera;
-extern GLFWwindow* g_window;
+
+#ifndef __EMSCRIPTEN__
+    extern GLFWwindow* g_window;
+    VkBuffer cameraUBOBuffer;
+    VkDeviceMemory cameraUBOMemory;
+#else
+    WGPUBuffer cameraBuffer;
+#endif
 
 typedef struct {
     float view[16];
@@ -18,9 +27,6 @@ typedef struct {
     float inverseView[16];
 } CameraUBO;
 CameraUBO cameraUBOData;
-
-VkBuffer cameraUBOBuffer;
-VkDeviceMemory cameraUBOMemory;
 
 void init_camera(void);
 void update_camera(float deltaTime);

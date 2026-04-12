@@ -1,8 +1,9 @@
+#ifndef __EMSCRIPTEN__
 #include "pch.h"
 #include "scene/lights.h"
 #include "scene/model.h"
 #include "core/math.h"
-#include "rendering/renderer.h" 
+#include "rendering/renderer_vulkan.h" 
 #include "rendering/shaders.h"
 #define CGLTF_IMPLEMENTATION
 #define CGLTF_MESHOPT_DECODE 1
@@ -10,7 +11,7 @@
 #include "cgltf.h"
 
 extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-extern VkDevice device;
+extern VkDevice vk_device;
 extern VkPipeline modelPipeline;
 extern VkPipelineLayout modelPipelineLayout;
 extern VkDescriptorSet modelDescriptorSet;
@@ -43,11 +44,11 @@ void create_model_pipeline(void)
     sm.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 
     sm.codeSize = vert_size; sm.pCode = vert_code;
-    vkCreateShaderModule(device, &sm, NULL, &modelVertModule);
+    vkCreateShaderModule(vk_device, &sm, NULL, &modelVertModule);
     free(vert_code);
 
     sm.codeSize = frag_size; sm.pCode = frag_code;
-    vkCreateShaderModule(device, &sm, NULL, &modelFragModule);
+    vkCreateShaderModule(vk_device, &sm, NULL, &modelFragModule);
     free(frag_code);
 
     VkPipelineShaderStageCreateInfo stages[2] = {0};
@@ -138,7 +139,7 @@ void create_model_pipeline(void)
     pipeInfo.renderPass = renderPass;
     pipeInfo.subpass = 0;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeInfo, NULL, &modelPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(vk_device, VK_NULL_HANDLE, 1, &pipeInfo, NULL, &modelPipeline) != VK_SUCCESS) {
         printf("Failed to create model pipeline\n");
         exit(1);
     }
@@ -153,8 +154,8 @@ static void create_instance_buffer(uint32_t capacity)
 
     // Destroy old buffer if it exists
     if (g_model_system.instanceBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device, g_model_system.instanceBuffer, NULL);
-        vkFreeMemory(device, g_model_system.instanceMemory, NULL);
+        vkDestroyBuffer(vk_device, g_model_system.instanceBuffer, NULL);
+        vkFreeMemory(vk_device, g_model_system.instanceMemory, NULL);
     }
 
     create_vulkan_buffer(newSize,
@@ -188,7 +189,7 @@ void create_model_descriptors(void)
     setLayoutInfo.bindingCount = 2;
     setLayoutInfo.pBindings = bindings;
 
-    vkCreateDescriptorSetLayout(device, &setLayoutInfo, NULL, &modelDescriptorSetLayout);
+    vkCreateDescriptorSetLayout(vk_device, &setLayoutInfo, NULL, &modelDescriptorSetLayout);
 
     // --- Pipeline layout ---
     VkDescriptorSetLayout setLayouts[2] = {
@@ -201,7 +202,7 @@ void create_model_descriptors(void)
     pipelineLayoutInfo.setLayoutCount = 2;
     pipelineLayoutInfo.pSetLayouts = setLayouts;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &modelPipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(vk_device, &pipelineLayoutInfo, NULL, &modelPipelineLayout) != VK_SUCCESS) {
         printf("Failed to create model pipeline layout\n");
         exit(1);
     }
@@ -215,7 +216,7 @@ void create_model_descriptors(void)
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = 2;
-    vkCreateDescriptorPool(device, &poolInfo, NULL, &modelDescriptorPool);
+    vkCreateDescriptorPool(vk_device, &poolInfo, NULL, &modelDescriptorPool);
 
     VkDescriptorSetAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -225,7 +226,7 @@ void create_model_descriptors(void)
 
     VkDescriptorSet sets[2];
 
-    if (vkAllocateDescriptorSets(device, &allocInfo, sets) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(vk_device, &allocInfo, sets) != VK_SUCCESS) {
         printf("FAILED TO ALLOCATE DESCRIPTOR SETS\n");
         exit(1);
     }
@@ -242,7 +243,7 @@ void create_model_descriptors(void)
     write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     write.descriptorCount = 1;
     write.pBufferInfo = &camInfo;
-    vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+    vkUpdateDescriptorSets(vk_device, 1, &write, 0, NULL);
 }
 
 void update_model_descriptor(void)
@@ -266,7 +267,7 @@ void update_model_descriptor(void)
         printf("MODEL DESCRIPTOR IS NULL\n");
         exit(1);
     }
-    vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+    vkUpdateDescriptorSets(vk_device, 1, &write, 0, NULL);
 }
 
 void init_model_system(void)
@@ -392,18 +393,18 @@ Model* find_or_load_model(const char* glb_path)
                          &mesh.vertexBuffer, &mesh.vertexMemory);
 
     void* data_ptr;
-    vkMapMemory(device, mesh.vertexMemory, 0, vsize, 0, &data_ptr);
+    vkMapMemory(vk_device, mesh.vertexMemory, 0, vsize, 0, &data_ptr);
     memcpy(data_ptr, vertices, vsize);
-    vkUnmapMemory(device, mesh.vertexMemory);
+    vkUnmapMemory(vk_device, mesh.vertexMemory);
 
     if (index_count > 0) {
         VkDeviceSize isize = index_count * sizeof(uint32_t);
         create_vulkan_buffer(isize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                              &mesh.indexBuffer, &mesh.indexMemory);
 
-        vkMapMemory(device, mesh.indexMemory, 0, isize, 0, &data_ptr);
+        vkMapMemory(vk_device, mesh.indexMemory, 0, isize, 0, &data_ptr);
         memcpy(data_ptr, indices, isize);
-        vkUnmapMemory(device, mesh.indexMemory);
+        vkUnmapMemory(vk_device, mesh.indexMemory);
         mesh.indexCount = (uint32_t)index_count;
     }
     mesh.vertexCount = vertexCount;
@@ -477,7 +478,7 @@ void update_model_instances(void)
     }
 
     void* data;
-    vkMapMemory(device, g_model_system.instanceMemory, 0, needed, 0, &data);
+    vkMapMemory(vk_device, g_model_system.instanceMemory, 0, needed, 0, &data);
     
     // Transpose each model matrix while copying (optimal place)
     InstanceData* gpuData = (InstanceData*)data;
@@ -497,7 +498,7 @@ void update_model_instances(void)
         gpuData[i].color[2] = cpuInst->color[2];
         gpuData[i].color[3] = cpuInst->color[3];
     }
-    vkUnmapMemory(device, g_model_system.instanceMemory);
+    vkUnmapMemory(vk_device, g_model_system.instanceMemory);
 }
 
 void draw_models(VkCommandBuffer cmd)
@@ -535,11 +536,11 @@ void cleanup_model_system(void)
     // Destroy all loaded models' meshes
     for (uint32_t i = 0; i < g_model_system.modelCount; ++i) {
         Mesh* m = &g_model_system.models[i].mesh;
-        vkDestroyBuffer(device, m->vertexBuffer, NULL);
-        vkFreeMemory(device, m->vertexMemory, NULL);
+        vkDestroyBuffer(vk_device, m->vertexBuffer, NULL);
+        vkFreeMemory(vk_device, m->vertexMemory, NULL);
         if (m->indexCount > 0) {
-            vkDestroyBuffer(device, m->indexBuffer, NULL);
-            vkFreeMemory(device, m->indexMemory, NULL);
+            vkDestroyBuffer(vk_device, m->indexBuffer, NULL);
+            vkFreeMemory(vk_device, m->indexMemory, NULL);
         }
         free(g_model_system.models[i].name);
     }
@@ -548,10 +549,11 @@ void cleanup_model_system(void)
     free(g_model_system.instances);
 
     if (g_model_system.instanceBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device, g_model_system.instanceBuffer, NULL);
-        vkFreeMemory(device, g_model_system.instanceMemory, NULL);
+        vkDestroyBuffer(vk_device, g_model_system.instanceBuffer, NULL);
+        vkFreeMemory(vk_device, g_model_system.instanceMemory, NULL);
     }
 
     // Reset everything
     g_model_system = (ModelSystem){0};
 }
+#endif

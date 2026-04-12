@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #include "pch.h"
 #include "watcher.h"
 #include "rendering/shaders.h"
@@ -261,3 +262,4 @@ void watcher_cleanup(void)
     }
     g_num_watchers = 0;
 }
+#endif

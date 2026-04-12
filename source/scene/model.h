@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #pragma once
 
 typedef struct {
@@ -59,3 +60,4 @@ void cleanup_model_system(void);
 
 void create_model_descriptors(void);
 void update_model_descriptor(void);
+#endif

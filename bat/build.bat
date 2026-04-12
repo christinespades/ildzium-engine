@@ -5,12 +5,19 @@ setlocal enabledelayedexpansion
 set BUILD_DIR=..\builds\debug
 set OUT_EXE=ildzium.exe
 
+set BUILD_WEB=0
 set LOG_FLAGS=
 for %%a in (%*) do (
+    if /I "%%a"=="-WEB" set BUILD_WEB=1
     if /I "%%a"=="-LOG_SCOPE" set LOG_FLAGS=!LOG_FLAGS! /DLOG_SCOPE_ENABLED
     if /I "%%a"=="-LOG_MALLOC" set LOG_FLAGS=!LOG_FLAGS! /DLOG_MALLOC_ENABLED
 )
-
+if "%BUILD_WEB%"=="1" (
+    goto BUILD_WEB
+) else (
+    goto BUILD_NATIVE
+)
+:BUILD_NATIVE
 :: Vulkan
 set "VULKAN_INCLUDE=%VULKAN_SDK%\Include"
 set "VULKAN_LIB=%VULKAN_SDK%\Lib"
@@ -64,11 +71,14 @@ if errorlevel 1 (
     exit /b
 )
 
-:: Collect all .c files in the current directory
+:: Collect all .c files in the current directory, excluding other platform headers
 set "SRC_FILES="
 for /R ..\source %%f in (*.c) do (
-    if /I not "%%~nxf"=="pch.c" (
-        set "SRC_FILES=!SRC_FILES! %%f"
+    echo %%~nxf | findstr /I "webgpu" >nul
+    if errorlevel 1 (
+        if /I not "%%~nxf"=="pch.c" (
+            set "SRC_FILES=!SRC_FILES! %%f"
+        )
     )
 )
 
@@ -127,3 +137,43 @@ if exist "%BUILD_DIR%\%OUT_EXE%" (
     echo Check the errors above.
     pause
 )
+goto END
+
+:BUILD_WEB
+
+echo ====================================
+echo Building WEB (WASM + WebGPU)
+echo ====================================
+
+set WEB_BUILD_DIR=..\builds\web
+if not exist %WEB_BUILD_DIR% mkdir %WEB_BUILD_DIR%
+
+:: Collect sources
+set "SRC_FILES="
+for /R ..\source %%f in (*.c) do (
+    if /I not "%%~nxf"=="pch.c" (
+        set "SRC_FILES=!SRC_FILES! %%f"
+    )
+)
+
+emcc %SRC_FILES% ^
+    -I"..\source" ^
+    -I"%THIRDPARTY_INCLUDE%" ^
+    -O2 ^
+    --use-port=emdawnwebgpu ^
+    -s FULL_ES3=1 ^
+    -s ALLOW_MEMORY_GROWTH=1 ^
+    -s WASM=1 ^
+    -s ASSERTIONS=1 ^
+    -s EXPORTED_FUNCTIONS="['_main']" ^
+    -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
+    -o "%WEB_BUILD_DIR%\index.html"
+
+xcopy /E /I /Y ..\assets %WEB_BUILD_DIR%\assets
+xcopy /Y ..\web\* %WEB_BUILD_DIR%\
+
+echo.
+echo WEB BUILD COMPLETE
+echo Output: %WEB_BUILD_DIR%\index.html
+goto END
+:END

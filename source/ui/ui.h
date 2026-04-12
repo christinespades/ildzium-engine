@@ -1,37 +1,13 @@
 #pragma once
 #include "core/events.h"
+#include "core/platform.h"
 #include "core/settings.h"
+#include "ui/ui_context.h"
+#include "input/input.h"
 #include "scene/sky.h"
 #include "ui/ui_callbacks.h"
 #include "ui/ui_editor.h"
-
-typedef enum {
-    UI_MODE_CAMERA = 0,
-    UI_MODE_FX,
-    UI_MODE_INPUT,
-    UI_MODE_LIGHTS,
-    UI_MODE_MAIN,
-    UI_MODE_MESHES,
-    UI_MODE_SKYBOX,
-    UI_MODE_SOUNDS,
-    UI_MODE_TERRAIN,
-    UI_MODE_COUNT
-} UI_Mode;
-
-#include "ui/ui_button.h"
-
-typedef struct UI_Context {
-    UI_Button* buttons;
-    int button_count;
-    int cursor_captured;
-    uint8_t* button_held_last_frame;
-    UI_Mode current_mode;
-} UI_Context;
-
-UI_Context* g_ui_ctx;   // global so callbacks can reach it
-
 #include "ui/ui_elements.h"
-#include "ui/modes/ui_modes.h"
 
 void ui_init(UI_Context* ctx);
 void ui_cleanup(UI_Context* ctx);   // important for freeing memory

@@ -1,6 +1,8 @@
+#ifndef __EMSCRIPTEN__
 #include "pch.h"
 #include "core/memory.h"
 
+extern VkDevice vk_device;
 extern VkPhysicalDevice physicalDevice;
 
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
@@ -27,13 +29,13 @@ void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
     bufInfo.usage = usage;
     bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(device, &bufInfo, NULL, buffer) != VK_SUCCESS) {
+    if (vkCreateBuffer(vk_device, &bufInfo, NULL, buffer) != VK_SUCCESS) {
         printf("Failed to create buffer\n");
         exit(1);
     }
 
     VkMemoryRequirements memReq;
-    vkGetBufferMemoryRequirements(device, *buffer, &memReq);
+    vkGetBufferMemoryRequirements(vk_device, *buffer, &memReq);
 
     VkMemoryAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -42,9 +44,10 @@ void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    if (vkAllocateMemory(device, &allocInfo, NULL, memory) != VK_SUCCESS) {
+    if (vkAllocateMemory(vk_device, &allocInfo, NULL, memory) != VK_SUCCESS) {
         printf("Failed to allocate buffer memory\n");
         exit(1);
     }
-    vkBindBufferMemory(device, *buffer, *memory, 0);
+    vkBindBufferMemory(vk_device, *buffer, *memory, 0);
 }
+#endif

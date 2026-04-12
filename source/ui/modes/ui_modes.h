@@ -1,5 +1,4 @@
 #pragma once
-
 #include "ui/modes/ui_camera.h"
 #include "ui/modes/ui_fx.h"
 #include "ui/modes/ui_input.h"

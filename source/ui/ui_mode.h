@@ -1,0 +1,14 @@
+#pragma once
+
+typedef enum {
+    UI_MODE_CAMERA = 0,
+    UI_MODE_FX,
+    UI_MODE_INPUT,
+    UI_MODE_LIGHTS,
+    UI_MODE_MAIN,
+    UI_MODE_MESHES,
+    UI_MODE_SKYBOX,
+    UI_MODE_SOUNDS,
+    UI_MODE_TERRAIN,
+    UI_MODE_COUNT
+} UI_Mode;

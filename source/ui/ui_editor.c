@@ -1,11 +1,10 @@
 #include "pch.h"
 #include "ui_editor.h"
 
-extern GLFWwindow* g_window; 
+#ifndef __EMSCRIPTEN__
+    extern GLFWwindow* g_window; 
+#endif
 
-static int is_word_char(char c) {
-    return isalnum((unsigned char)c) || c == '_';
-}
 static void get_cursor_line_info(const char* text, int cursor,
                                  int* out_line_start,
                                  int* out_col)
@@ -34,66 +33,6 @@ void ensure_capacity(UI_Button* b, size_t needed) {
         b->editable_content = new_buf;
         b->content_capacity = new_cap;
     }
-}
-
-void insert_char_at_cursor(UI_Button* b, char c) {
-    if (!b->is_editable || !b->editable_content) return;
-
-    push_undo_state(b);
-
-    // Delete selection first if any
-    if (b->selection_start != -1) {
-        int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
-        int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
-        memmove(b->editable_content + start, b->editable_content + end, strlen(b->editable_content + end) + 1);
-        b->cursor_pos = start;
-        b->selection_start = b->selection_end = -1;
-    }
-
-    size_t len = strlen(b->editable_content);
-    ensure_capacity(b, len + 2);
-
-    memmove(b->editable_content + b->cursor_pos + 1, b->editable_content + b->cursor_pos, len - b->cursor_pos + 1);
-    b->editable_content[b->cursor_pos] = c;
-    b->cursor_pos++;
-    b->content_height = 0.0f; // invalidate
-}
-
-void delete_char_before_cursor(UI_Button* b) {
-    if (!b->is_editable || b->cursor_pos <= 0) return;
-
-    push_undo_state(b);
-
-    if (b->selection_start != -1) {
-        int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
-        int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
-        memmove(b->editable_content + start, b->editable_content + end, strlen(b->editable_content + end) + 1);
-        b->cursor_pos = start;
-        b->selection_start = b->selection_end = -1;
-    } else {
-        memmove(b->editable_content + b->cursor_pos - 1, b->editable_content + b->cursor_pos, strlen(b->editable_content + b->cursor_pos) + 1);
-        b->cursor_pos--;
-    }
-    b->content_height = 0.0f;
-}
-
-void delete_char_at_cursor(UI_Button* b) {
-    if (!b->is_editable) return;
-    size_t len = strlen(b->editable_content);
-    if (b->cursor_pos >= len) return;
-
-    push_undo_state(b);
-
-    if (b->selection_start != -1) {
-        int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
-        int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
-        memmove(b->editable_content + start, b->editable_content + end, strlen(b->editable_content + end) + 1);
-        b->cursor_pos = start;
-        b->selection_start = b->selection_end = -1;
-    } else {
-        memmove(b->editable_content + b->cursor_pos, b->editable_content + b->cursor_pos + 1, len - b->cursor_pos);
-    }
-    b->content_height = 0.0f;
 }
 
 void move_cursor_left(UI_Button* b, int steps) {
@@ -151,51 +90,6 @@ void move_to_end(UI_Button* b)  { b->cursor_pos = (int)strlen(b->editable_conten
 
 int get_text_length(UI_Button* b) {
     return b->editable_content ? (int)strlen(b->editable_content) : 0;
-}
-
-// ====================== CLIPBOARD ======================
-void copy_selection_to_clipboard(UI_Button* b) {
-    if (b->selection_start == -1 || !b->editable_content) return;
-
-    int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
-    int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
-
-    if (start == end) return;
-
-    char* selected = (char*)malloc(end - start + 1);
-    strncpy(selected, b->editable_content + start, end - start);
-    selected[end - start] = '\0';
-
-    glfwSetClipboardString(g_window, selected);
-    free(selected);
-}
-
-void paste_from_clipboard(UI_Button* b) {
-    if (!b->is_editable || !b->editable_content) return;
-
-    const char* clipboard = glfwGetClipboardString(g_window);
-    if (!clipboard || !*clipboard) return;
-
-    push_undo_state(b);
-
-    // Delete current selection first
-    if (b->selection_start != -1) {
-        int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
-        int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
-        memmove(b->editable_content + start, b->editable_content + end, strlen(b->editable_content + end) + 1);
-        b->cursor_pos = start;
-        b->selection_start = b->selection_end = -1;
-    }
-
-    size_t clip_len = strlen(clipboard);
-    size_t cur_len = strlen(b->editable_content);
-    ensure_capacity(b, cur_len + clip_len + 1);
-
-    memmove(b->editable_content + b->cursor_pos + clip_len, b->editable_content + b->cursor_pos, cur_len - b->cursor_pos + 1);
-    memcpy(b->editable_content + b->cursor_pos, clipboard, clip_len);
-
-    b->cursor_pos += (int)clip_len;
-    b->content_height = 0.0f; // invalidate
 }
 
 // ====================== MOUSE TO CURSOR ======================

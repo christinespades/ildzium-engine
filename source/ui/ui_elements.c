@@ -77,7 +77,7 @@ void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, 
 	else
 	    b->editable_content[0] = '\0';
 	
-    b->filepath = _strdup(filepath);
+    b->filepath = platform_strdup(filepath);
     init_editor_undo(b, EDITOR_UNDO_HISTORY_AMOUNT); // need to call this for undo system, and free it when we destroy text editor button
     ctx->button_count++;
 }

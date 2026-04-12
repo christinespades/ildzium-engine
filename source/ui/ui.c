@@ -12,7 +12,9 @@ extern void setup_skybox_controls(UI_Context* ctx);
 extern void setup_sounds_controls(UI_Context* ctx);
 extern void setup_terrain_controls(UI_Context* ctx);
 
-extern GLFWwindow* g_window; 
+#ifndef __EMSCRIPTEN__
+    extern GLFWwindow* g_window; 
+#endif
 
 float mouse_wheel_sensitivity = 40.0f;
 
@@ -195,13 +197,13 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
             int pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
 
             if (is_pressed) {   // mouse button is down this frame
-                double now = glfwGetTime();
+                double now = platform_get_time();
                 b->is_dragging = true;
                 b->drag_start_pos = pos;
 
                 // === SHIFT + CLICK / DRAG ===
-                if (glfwGetKey(g_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-                    glfwGetKey(g_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                if (platform_get_key_down(KEY_LEFT_SHIFT) ||
+                    platform_get_key_down(KEY_RIGHT_SHIFT))
                 {
                     if (b->selection_start == -1)
                         b->selection_start = b->cursor_pos;

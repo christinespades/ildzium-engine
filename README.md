@@ -1,6 +1,33 @@
 # ildzium-engine
 >“Toy engine” here means a personal project, not production-ready. Open sourcing or external contributions would only occur if a functional demo were achieved, likely years in the future.
 
+## Build – Requirements & Steps
+>This is incomplete and might not work yet.
+### Run:
+  - `bat/build.bat`
+
+### Build process:
+  - Uses MSVC (`cl`)
+  - Uses precompiled headers (.pch)
+  - Runs additional scripts:
+    - Shader compilation
+    - Mesh optimization
+  - Launches the executable on success
+
+### Default target (Windows):
+  - Graphics API: Vulkan
+  - Requires:
+    - Windows SDK
+    - Vulkan SDK
+    - GLFW
+
+### Web target:
+  - Build with:
+    - `bat/build.bat -web`
+  - Graphics API: WebGPU
+  - Requires:
+    - Emscripten SDK (`emsdk`) installed and activated with flag --permanent
+
 ## Technical Overview
 Ildzium Engine is a Windows-based toy game engine built on the Vulkan API, designed for maximum performance and aesthetic control. It emphasizes rapid iteration through extensive hot-reloading capabilities across core subsystems, including engine architecture, rendering pipelines, and shader programs. It trades general-purpose flexibility for a tightly integrated, constraint-based design that prioritizes efficiency and creative expression through computation and post-processing rather than raw scene complexity.
 

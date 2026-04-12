@@ -1,5 +1,13 @@
 #include "pch.h"
 #include "scene/camera.h"
+#include "rendering/device.h"
+#ifdef __EMSCRIPTEN__
+    #include "rendering/renderer_webgpu.h"
+
+WGPUBuffer cameraBuffer = NULL;
+#else
+    #include "rendering/renderer_vulkan.h"
+#endif
 
 Camera camera = {0.0f, 0.0f, 5.0f, -90.0f, 0.0f, 15.0f};
 
@@ -79,6 +87,33 @@ void update_camera(float deltaTime)
     float velocity = camera.speed * deltaTime;
     float yawRad = camera.yaw * (PI / 180.0f);
 
+#ifdef __EMSCRIPTEN__
+    // Web version - use our key state array
+    if (g_keys[87]) { // W
+        camera.x += sinf(yawRad) * velocity;
+        camera.z += cosf(yawRad) * velocity;
+    }
+    if (g_keys[83]) { // S
+        camera.x -= sinf(yawRad) * velocity;
+        camera.z -= cosf(yawRad) * velocity;
+    }
+    float strafeYaw = yawRad - (PI / 2.0f);
+    if (g_keys[65]) { // A
+        camera.x += sinf(strafeYaw) * velocity;
+        camera.z += cosf(strafeYaw) * velocity;
+    }
+    if (g_keys[68]) { // D
+        camera.x -= sinf(strafeYaw) * velocity;
+        camera.z -= cosf(strafeYaw) * velocity;
+    }
+    if (g_keys[32]) { // Space
+        camera.y += velocity;
+    }
+    if (g_keys[16]) { // Left Shift (keyCode 16)
+        camera.y -= velocity;
+    }
+#else
+    // Native GLFW version (unchanged)
     if (glfwGetKey(g_window, GLFW_KEY_W) == GLFW_PRESS) {
         camera.x += sinf(yawRad) * velocity;
         camera.z += cosf(yawRad) * velocity;
@@ -87,7 +122,6 @@ void update_camera(float deltaTime)
         camera.x -= sinf(yawRad) * velocity;
         camera.z -= cosf(yawRad) * velocity;
     }
-
     float strafeYaw = yawRad - (PI / 2.0f);
     if (glfwGetKey(g_window, GLFW_KEY_A) == GLFW_PRESS) {
         camera.x += sinf(strafeYaw) * velocity;
@@ -97,11 +131,11 @@ void update_camera(float deltaTime)
         camera.x -= sinf(strafeYaw) * velocity;
         camera.z -= cosf(strafeYaw) * velocity;
     }
-
     if (glfwGetKey(g_window, GLFW_KEY_SPACE) == GLFW_PRESS)
         camera.y += velocity;
     if (glfwGetKey(g_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         camera.y -= velocity;
+#endif
 }
 
 void update_camera_ubo(void)
@@ -109,7 +143,14 @@ void update_camera_ubo(void)
     float view[16], proj[16], invView[16];
 
     camera_get_view_matrix(view);
-    camera_get_projection_matrix(proj, (float)swapchainExtent.width / (float)swapchainExtent.height);
+#ifdef __EMSCRIPTEN__
+    // WebGPU version - use global width/height (you already have g_width / g_height)
+    float aspect = (float)g_width / (float)g_height;
+#else
+    // Vulkan / GLFW version
+    float aspect = (float)swapchainExtent.width / (float)swapchainExtent.height;
+#endif
+    camera_get_projection_matrix(proj, aspect);
 
     if (!matrix_inverse(view, invView)) {
         // Fallback to identity if inversion fails (should rarely happen)
@@ -121,8 +162,16 @@ void update_camera_ubo(void)
     memcpy(cameraUBOData.proj, proj, 16 * sizeof(float));
     memcpy(cameraUBOData.inverseView, invView, 16 * sizeof(float));  // Add this field to CameraUBO
 
-    void* data;
-    vkMapMemory(device, cameraUBOMemory, 0, sizeof(CameraUBO), 0, &data);
-    memcpy(data, &cameraUBOData, sizeof(CameraUBO));
-    vkUnmapMemory(device, cameraUBOMemory);
+    #ifdef __EMSCRIPTEN__
+        // WebGPU: write directly to GPU buffer via queue
+        if (cameraBuffer) {
+            wgpuQueueWriteBuffer(queue, cameraBuffer, 0, &cameraUBOData, sizeof(CameraUBO));
+        }
+    #else
+        // Vulkan: map + memcpy + unmap
+        void* data;
+        vkMapMemory(vk_device, cameraUBOMemory, 0, sizeof(CameraUBO), 0, &data);
+        memcpy(data, &cameraUBOData, sizeof(CameraUBO));
+        vkUnmapMemory(vk_device, cameraUBOMemory);
+    #endif
 }

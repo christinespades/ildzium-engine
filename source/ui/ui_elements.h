@@ -1,5 +1,6 @@
 #pragma once
 #include "core/debug.h"
+#include "core/string.h"
 #include "ui/ui.h"
 #include "ui/ui_callbacks.h"
 #include "ui/ui_params.h"

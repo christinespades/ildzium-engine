@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #pragma once
 typedef struct {
     float timeOfDay;        // 0.0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1.0 = midnight
@@ -63,3 +64,4 @@ void sky_init(void);
 void sky_cleanup(void);
 void sky_draw(VkCommandBuffer cmd);          // call this instead of the old inline sky code
 void sky_update(void);                  // call every frame before drawing
+#endif

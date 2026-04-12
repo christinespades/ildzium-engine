@@ -1,10 +1,10 @@
 #include "pch.h"
-#include "rendering/surface.h"
-#include "input/input.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#ifndef __EMSCRIPTEN__
+    #include "rendering/surface.h"
+    #include "input/input.h"
+    #define STB_IMAGE_IMPLEMENTATION
+    #include "stb_image.h"
 
-GLFWwindow* g_window = NULL;
 VkInstance vk_instance = VK_NULL_HANDLE;
 VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
 
@@ -101,3 +101,4 @@ void create_surface(void)
         exit(1);
     }
 }
+#endif

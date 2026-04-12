@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #include "pch.h"
 #include "scene/sky.h"
 #include "scene/camera.h"
@@ -40,7 +41,7 @@ static VkDescriptorSet skyDescriptorSet = VK_NULL_HANDLE;
 
 extern void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
                                  VkBuffer* buffer, VkDeviceMemory* memory);
-extern VkDevice device;
+extern VkDevice vk_device;
 extern VkExtent2D swapchainExtent;
 extern VkRenderPass renderPass;
 extern CameraUBO cameraUBOData;
@@ -76,7 +77,7 @@ static void create_sky_descriptors(void)
     layoutInfo.bindingCount = 2;
     layoutInfo.pBindings = bindings;
 
-    vkCreateDescriptorSetLayout(device, &layoutInfo, NULL, &skyDescriptorSetLayout);
+    vkCreateDescriptorSetLayout(vk_device, &layoutInfo, NULL, &skyDescriptorSetLayout);
 
     VkDescriptorPoolSize poolSize = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
     VkDescriptorPoolCreateInfo poolInfo = {0};
@@ -84,14 +85,14 @@ static void create_sky_descriptors(void)
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = &poolSize;
     poolInfo.maxSets = 1;
-    vkCreateDescriptorPool(device, &poolInfo, NULL, &skyDescriptorPool);
+    vkCreateDescriptorPool(vk_device, &poolInfo, NULL, &skyDescriptorPool);
 
     VkDescriptorSetAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = skyDescriptorPool;
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &skyDescriptorSetLayout;
-    vkAllocateDescriptorSets(device, &allocInfo, &skyDescriptorSet);
+    vkAllocateDescriptorSets(vk_device, &allocInfo, &skyDescriptorSet);
 
     // Initial write
     VkDescriptorBufferInfo bufInfo = { skyUBOBuffer, 0, sizeof(SkyUBO) };
@@ -102,7 +103,7 @@ static void create_sky_descriptors(void)
     write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     write.descriptorCount = 1;
     write.pBufferInfo = &bufInfo;
-    vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+    vkUpdateDescriptorSets(vk_device, 1, &write, 0, NULL);
 }
 
 void create_sky_pipeline(void)
@@ -117,12 +118,12 @@ void create_sky_pipeline(void)
 
     VkShaderModuleCreateInfo vertCreate = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                                             .codeSize = vert_size, .pCode = vert_code };
-    vkCreateShaderModule(device, &vertCreate, NULL, &vertShaderModule);
+    vkCreateShaderModule(vk_device, &vertCreate, NULL, &vertShaderModule);
     free(vert_code);
 
     VkShaderModuleCreateInfo fragCreate = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                                             .codeSize = frag_size, .pCode = frag_code };
-    vkCreateShaderModule(device, &fragCreate, NULL, &fragShaderModule);
+    vkCreateShaderModule(vk_device, &fragCreate, NULL, &fragShaderModule);
     free(frag_code);
 
     VkPipelineShaderStageCreateInfo shaderStages[2] = {
@@ -180,7 +181,7 @@ void create_sky_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &skyDescriptorSetLayout;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, &skyPipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(vk_device, &pipelineLayoutInfo, NULL, &skyPipelineLayout) != VK_SUCCESS) {
         printf("Failed to create sky pipeline layout\n");
         exit(1);
     }
@@ -202,7 +203,7 @@ void create_sky_pipeline(void)
         .subpass = 0
     };
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &skyPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(vk_device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &skyPipeline) != VK_SUCCESS) {
         printf("Failed to create sky pipeline\n");
         exit(1);
     }
@@ -219,15 +220,15 @@ void sky_init(void)
 
 void sky_cleanup(void)
 {
-    vkDeviceWaitIdle(device);
-    vkDestroyPipeline(device, skyPipeline, NULL);
-    vkDestroyPipelineLayout(device, skyPipelineLayout, NULL);
-    vkDestroyShaderModule(device, vertShaderModule, NULL);
-    vkDestroyShaderModule(device, fragShaderModule, NULL);
-    vkDestroyBuffer(device, skyUBOBuffer, NULL);
-    vkFreeMemory(device, skyUBOMemory, NULL);
-    vkDestroyDescriptorSetLayout(device, skyDescriptorSetLayout, NULL);
-    vkDestroyDescriptorPool(device, skyDescriptorPool, NULL);
+    vkDeviceWaitIdle(vk_device);
+    vkDestroyPipeline(vk_device, skyPipeline, NULL);
+    vkDestroyPipelineLayout(vk_device, skyPipelineLayout, NULL);
+    vkDestroyShaderModule(vk_device, vertShaderModule, NULL);
+    vkDestroyShaderModule(vk_device, fragShaderModule, NULL);
+    vkDestroyBuffer(vk_device, skyUBOBuffer, NULL);
+    vkFreeMemory(vk_device, skyUBOMemory, NULL);
+    vkDestroyDescriptorSetLayout(vk_device, skyDescriptorSetLayout, NULL);
+    vkDestroyDescriptorPool(vk_device, skyDescriptorPool, NULL);
 }
 
 void sky_update(void)
@@ -280,9 +281,9 @@ void sky_update(void)
     memcpy(skyUBOData.inverseView, cameraUBOData.inverseView, 16 * sizeof(float));
     // Upload
     void* data;
-    vkMapMemory(device, skyUBOMemory, 0, sizeof(SkyUBO), 0, &data);
+    vkMapMemory(vk_device, skyUBOMemory, 0, sizeof(SkyUBO), 0, &data);
     memcpy(data, &skyUBOData, sizeof(SkyUBO));
-    vkUnmapMemory(device, skyUBOMemory);
+    vkUnmapMemory(vk_device, skyUBOMemory);
 }
 
 void sky_draw(VkCommandBuffer cmd)
@@ -296,3 +297,4 @@ void sky_draw(VkCommandBuffer cmd)
     vkCmdSetScissor(cmd, 0, 1, &scissor);
     vkCmdDraw(cmd, 4, 1, 0, 0);
 }
+#endif
