@@ -5,6 +5,7 @@
     EM_BOOL key_down(int eventType, const EmscriptenKeyboardEvent* e, void* userData)
     {
         platform_key key = translate_code(e->code);
+        printf("KEY DOWN: %s\n", e->code);
         if (key >= 0 && key < 512) {
             g_keys[key] = 1;
             if (g_ui_ctx->cursor_captured) {

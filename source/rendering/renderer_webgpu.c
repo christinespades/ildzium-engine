@@ -8,6 +8,8 @@
 extern CameraUBO cameraUBOData;
 
 WGPUDevice device = NULL;
+
+GPUState gpu_state = GPU_STATE_NOT_READY;
 WGPUSurface surface = NULL;
 WGPUTextureFormat swapchainFormat = WGPUTextureFormat_BGRA8Unorm;
 WGPURenderPipeline pipeline = NULL;
@@ -31,58 +33,64 @@ void webgpu_init(void)
         return;
     }
 
-    /* === Surface from Canvas (Emscripten-specific) === */
+    /* Surface from Canvas */
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvasSource = {0};
     canvasSource.chain.sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
     canvasSource.selector = (WGPUStringView){ .data = "#canvas", .length = WGPU_STRLEN };
 
     WGPUSurfaceDescriptor surfaceDesc = {0};
     surfaceDesc.nextInChain = &canvasSource.chain;
-
     surface = wgpuInstanceCreateSurface(instance, &surfaceDesc);
     if (!surface) {
         printf("Failed to create surface from canvas\n");
         return;
     }
 
-    /* === Request Adapter (modern callback style) === */
+    /* Request Adapter */
     WGPURequestAdapterOptions adapterOpts = {0};
     adapterOpts.compatibleSurface = surface;
 
     WGPURequestAdapterCallbackInfo adapterCallbackInfo = {0};
-    adapterCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents;   /* or WGPUCallbackMode_WaitAnyOnly if you poll */
+    adapterCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents;
     adapterCallbackInfo.callback = onAdapterRequest;
-    adapterCallbackInfo.userdata1 = NULL;
+    // You can pass userdata if needed (e.g., to signal completion)
 
     wgpuInstanceRequestAdapter(instance, &adapterOpts, adapterCallbackInfo);
-    /* Note: This is asynchronous. The real init continues in the callback. */
+
+    /* === WAIT FOR ADAPTER + DEVICE === */
+    gpu_state = GPU_STATE_NOT_READY;
+
+    // Simple spin-wait with yielding (works great in Emscripten main loop)
+    while (gpu_state != GPU_STATE_READY) {
+        wgpuInstanceProcessEvents(instance);   // This makes callbacks fire
+        emscripten_sleep(10);                  // Yield to browser (~10ms)
+    }
+
+    printf("WebGPU initialization completed successfully\n");
 }
 
 static void onAdapterRequest(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* userdata1, void* userdata2)
 {
-    (void)userdata1; (void)userdata2;
-
     if (status != WGPURequestAdapterStatus_Success) {
         printf("Failed to get adapter: %.*s\n", (int)message.length, message.data);
         return;
     }
 
+    // Request device (same as before)
     WGPUDeviceDescriptor deviceDesc = {0};
-
     WGPURequestDeviceCallbackInfo deviceCallbackInfo = {0};
     deviceCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents;
     deviceCallbackInfo.callback = onDeviceRequest;
-    deviceCallbackInfo.userdata1 = NULL;
-
     wgpuAdapterRequestDevice(adapter, &deviceDesc, deviceCallbackInfo);
+
+    gpu_state = GPU_STATE_ADAPTER_OK;   // optional intermediate state
 }
 
 static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPUStringView message, void* userdata1, void* userdata2)
 {
-    (void)userdata1; (void)userdata2;
-
     if (status != WGPURequestDeviceStatus_Success) {
         printf("Failed to get device: %.*s\n", (int)message.length, message.data);
+        gpu_state = GPU_STATE_NOT_READY;
         return;
     }
 
@@ -90,15 +98,27 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     queue = wgpuDeviceGetQueue(device);
 
     /* Configure surface */
-    WGPUSurfaceConfiguration config = {0};
-    config.device = device;
-    config.format = swapchainFormat;
-    config.usage = WGPUTextureUsage_RenderAttachment;
-    config.width = (uint32_t)width;
-    config.height = (uint32_t)height;
-    config.presentMode = WGPUPresentMode_Fifo;
+    WGPUSurfaceConfiguration config = {0};  // zero all fields first!
+
+    config.device       = device;
+    config.format       = swapchainFormat;
+    config.usage        = WGPUTextureUsage_RenderAttachment;
+    config.width        = (uint32_t)width;      // must be > 0
+    config.height       = (uint32_t)height;
+    config.presentMode  = WGPUPresentMode_Fifo;
+    config.alphaMode    = WGPUCompositeAlphaMode_Opaque;   // important for Emscripten
+
+    // These two lines prevent many "assertion failed" crashes:
+    config.viewFormatCount = 0;
+    config.viewFormats     = NULL;
+
+    if (width <= 0 || height <= 0) {
+        printf("ERROR: Invalid canvas size %dx%d before configure!\n", width, height);
+        return;
+    }
 
     wgpuSurfaceConfigure(surface, &config);
+    printf("Surface successfully configured: %d x %d\n", width, height);
 
     /* Uniform buffer */
     WGPUBufferDescriptor bufDesc = {0};
@@ -172,6 +192,11 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     fragment.targetCount = 1;
     fragment.targets = &colorTarget;
 
+    WGPUMultisampleState multisample = {0};
+    multisample.count = 1;                    // 1 = no multisampling
+    multisample.mask = 0xFFFFFFFF;
+    multisample.alphaToCoverageEnabled = false;
+
     WGPURenderPipelineDescriptor pipeDesc = {0};
     pipeDesc.layout = pipelineLayout;
     pipeDesc.vertex.module = shader;
@@ -180,6 +205,8 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     pipeDesc.vertex.buffers = &vbLayout;
     pipeDesc.fragment = &fragment;
     pipeDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+    pipeDesc.multisample = multisample;
+    pipeDesc.label = (WGPUStringView){ .data = "RedTrianglePipeline", .length = WGPU_STRLEN };
 
     pipeline = wgpuDeviceCreateRenderPipeline(device, &pipeDesc);
 
@@ -205,6 +232,7 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
 
     bindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
 
-    printf("WebGPU initialized successfully\n");
+    gpu_state = GPU_STATE_READY;
+    printf("WebGPU fully ready\n");
 }
 #endif

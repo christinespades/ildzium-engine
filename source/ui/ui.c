@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ui/ui.h"
 
+UI_Context* g_ui_ctx = {0};
 static float hold_accumulator = 0.0f;
 extern void setup_camera_controls(UI_Context* ctx);
 extern void setup_fx_controls(UI_Context* ctx);
@@ -172,7 +173,7 @@ void ui_button_mouse_up(UI_Button* b)
     b->is_dragging = false;
 }
 
-void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mouse_wheel, float dt)
+void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int mousewheel, float dt)
 {
     if (!ctx->cursor_captured) return;
 
@@ -185,8 +186,8 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
                         mouse_y >= b->y && mouse_y < b->y + b->h);
 
         // Scroll handling (works for both editors and scrollable panels)
-        if (b->is_scrollable && is_hover && mouse_wheel != 0) {
-            b->scroll_offset -= mouse_wheel * 25.0f;   // adjust sensitivity
+        if (b->is_scrollable && is_hover && mousewheel != 0) {
+            b->scroll_offset -= mousewheel * 25.0f;   // adjust sensitivity
         }
 
         int is_pressed = mouse_pressed && is_hover;

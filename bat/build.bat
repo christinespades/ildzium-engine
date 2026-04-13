@@ -141,7 +141,6 @@ goto END
 
 :BUILD_WEB
 
-echo ====================================
 echo Building WEB (WASM + WebGPU)
 echo ====================================
 
@@ -163,10 +162,17 @@ emcc %SRC_FILES% ^
     --use-port=emdawnwebgpu ^
     -s FULL_ES3=1 ^
     -s ALLOW_MEMORY_GROWTH=1 ^
+    -s ALLOW_TABLE_GROWTH=1 ^
+    -s RESERVED_FUNCTION_POINTERS=64 ^
     -s WASM=1 ^
     -s ASSERTIONS=1 ^
-    -s EXPORTED_FUNCTIONS="['_main']" ^
+    -s ENVIRONMENT=web ^
+    -s MODULARIZE=1 ^
+    -s EXPORT_ES6=0 ^
+    -sASYNCIFY=1 ^
+    -s EXPORTED_FUNCTIONS="['_main','_on_http_result']" ^
     -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
+    --js-library "..\source\platform\web\library_http.js" ^
     -o "%WEB_BUILD_DIR%\index.html"
 
 xcopy /E /I /Y ..\assets %WEB_BUILD_DIR%\assets
@@ -174,6 +180,4 @@ xcopy /Y ..\web\* %WEB_BUILD_DIR%\
 
 echo.
 echo WEB BUILD COMPLETE
-echo Output: %WEB_BUILD_DIR%\index.html
-goto END
 :END

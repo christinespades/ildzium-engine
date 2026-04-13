@@ -7,7 +7,9 @@
 
 // TODO: how to handle window resize on Web (using emscripten_set_resize_callback) and update g_width/g_height
 	void init_platform() {
+	#ifndef __EMSCRIPTEN__
 	    surface_init();
+	#endif
 	    init_input();
 
 	    g_ui_ctx = malloc(sizeof(UI_Context));

@@ -1,5 +1,5 @@
+#include "pch.h"
 #ifndef __EMSCRIPTEN__
-    #include "pch.h"
     #include "scene/lights.h"
 
     void init_lights(VkDevice dev,

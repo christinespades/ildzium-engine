@@ -10,6 +10,7 @@ WGPUBuffer cameraBuffer = NULL;
 #endif
 
 Camera camera = {0.0f, 0.0f, 5.0f, -90.0f, 0.0f, 15.0f};
+CameraUBO cameraUBOData = {0};
 
 #define PI 3.14159265359f
 

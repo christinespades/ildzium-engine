@@ -1,5 +1,4 @@
 #pragma once
-#include <stdint.h>
 
 typedef enum {
     CAMERA_NONE          = 0,
@@ -25,8 +24,8 @@ static uint32_t g_renderer_flags =
     RENDERER_SHOW_DRAWN |
     RENDERER_SHOW_CULLED;
 extern float g_fps;
-uint32_t g_drawn_count;
-uint32_t g_culled_count;
+extern uint32_t g_drawn_count;
+extern uint32_t g_culled_count;
 
 // toggle_flag(&g_camera_flags, CAMERA_SHOW_POS);
 static inline void toggle_flag(uint32_t *flags, uint32_t flag)

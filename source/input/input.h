@@ -6,5 +6,5 @@ void init_input();
 
 #ifndef __EMSCRIPTEN__
 	void handle_text_input(unsigned int codepoint);
-    static void input_toggle_mode(GLFWwindow* window);
+    void input_toggle_mode(GLFWwindow* window);
 #endif

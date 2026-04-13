@@ -18,7 +18,7 @@ extern Camera camera;
     VkBuffer cameraUBOBuffer;
     VkDeviceMemory cameraUBOMemory;
 #else
-    WGPUBuffer cameraBuffer;
+    extern WGPUBuffer cameraBuffer;
 #endif
 
 typedef struct {
@@ -26,7 +26,8 @@ typedef struct {
     float proj[16];
     float inverseView[16];
 } CameraUBO;
-CameraUBO cameraUBOData;
+
+extern CameraUBO cameraUBOData;
 
 void init_camera(void);
 void update_camera(float deltaTime);

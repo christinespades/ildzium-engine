@@ -1,5 +1,5 @@
+#include "pch.h"
 #ifndef __EMSCRIPTEN__
-    #include "pch.h"
     #include "ui/ui_renderer.h"
 
     extern VkDevice vk_device;

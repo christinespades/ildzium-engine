@@ -3,6 +3,8 @@
 
 #ifndef __EMSCRIPTEN__
 	#include "core/window.h"
+#else
+	void js_get_clipboard(void (*cb)(const char*, void*), void* user);
 #endif
 	void platform_set_clipboard(const char* text);
 	void platform_get_clipboard_async(void (*callback)(const char*, void*), void* user);

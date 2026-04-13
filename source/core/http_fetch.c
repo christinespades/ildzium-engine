@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "core/http_fetch.h"
+#include "core/string.h"
 
 #ifndef __EMSCRIPTEN__
 	// Fetch a URL into a malloc'd string (caller must free)

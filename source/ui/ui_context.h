@@ -10,4 +10,4 @@ typedef struct UI_Context {
     UI_Mode current_mode;
 } UI_Context;
 
-UI_Context* g_ui_ctx;   // global so callbacks can reach it
+extern UI_Context* g_ui_ctx;   // global so callbacks can reach it

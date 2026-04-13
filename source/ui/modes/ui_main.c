@@ -35,7 +35,6 @@ void setup_main_controls(UI_Context* ctx)
 {
     LoadState* state = malloc(sizeof(LoadState));
     state->ctx = ctx;
-
     platform_http_get(
         "https://raw.githubusercontent.com/christinespades/ildzium-engine/main/README.md",
         on_readme_loaded,

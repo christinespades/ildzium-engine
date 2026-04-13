@@ -8,5 +8,5 @@
 	void pick_physical_device(VkInstance instance, VkSurfaceKHR surface);
 	void create_logical_device();
 #else
-	WGPUQueue queue;
+	extern WGPUQueue queue;
 #endif

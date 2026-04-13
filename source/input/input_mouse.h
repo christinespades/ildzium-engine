@@ -1,7 +1,9 @@
 #pragma once
 #include "core/window.h"
+#include "scene/camera.h"
+#include "ui/ui_context.h"
 
-int mouse_wheel;
+extern int mouse_wheel;
 void set_mouse_callbacks();
 void platform_get_mouse_pos(double* x, double* y);
 int  platform_get_mouse_button(int button);

@@ -1,5 +1,8 @@
-#ifndef __EMSCRIPTEN__
 #pragma once
+#include "scene/camera.h"
+#include "rendering/shaders.h"   // assumes load_spirv is here
+#include "ui/ui.h"
+
 typedef struct {
     float timeOfDay;        // 0.0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1.0 = midnight
     float cycleSpeed;       // multiplier for automatic progression (set to 0 to disable auto cycle)
@@ -29,39 +32,40 @@ typedef struct {
 
 extern SkyParameters g_skyParams;
 
-typedef struct {
-    float time;
-    float yaw;
-    float pitch;
-    float timeOfDay;
-    float dayNightBlend;
-    float nebulaSpeed;
-    float nebulaScale;
-    float nebulaIntensity;
-    float nebulaLayerCount;
-    float starCount;
-    float starBrightness;
-    float starTwinkleSpeed;
-    float starSize;
-    float auroraIntensity;
-    float auroraSpeed;
-    float pad0;               // 16-byte alignment padding for the next vec4
-    float nebulaColorNight[4]; // Must be 4 floats
-    float nebulaColorDay[4];   // Must be 4 floats
-    float auroraColor[4];      // Must be 4 floats
-    float vignetteStrength;
-    float overallBrightness;
-    float pad1, pad2;          // Pad the end to 16-byte multiple
-    float inverseView[16];
-} SkyUBO;
+#ifndef __EMSCRIPTEN__
+    typedef struct {
+        float time;
+        float yaw;
+        float pitch;
+        float timeOfDay;
+        float dayNightBlend;
+        float nebulaSpeed;
+        float nebulaScale;
+        float nebulaIntensity;
+        float nebulaLayerCount;
+        float starCount;
+        float starBrightness;
+        float starTwinkleSpeed;
+        float starSize;
+        float auroraIntensity;
+        float auroraSpeed;
+        float pad0;               // 16-byte alignment padding for the next vec4
+        float nebulaColorNight[4]; // Must be 4 floats
+        float nebulaColorDay[4];   // Must be 4 floats
+        float auroraColor[4];      // Must be 4 floats
+        float vignetteStrength;
+        float overallBrightness;
+        float pad1, pad2;          // Pad the end to 16-byte multiple
+        float inverseView[16];
+    } SkyUBO;
 
-extern VkPipeline skyPipeline;
-extern VkPipelineLayout skyPipelineLayout;
-extern VkShaderModule vertShaderModule;
-extern VkShaderModule fragShaderModule;
+    extern VkPipeline skyPipeline;
+    extern VkPipelineLayout skyPipelineLayout;
+    extern VkShaderModule vertShaderModule;
+    extern VkShaderModule fragShaderModule;
 
-void sky_init(void);
-void sky_cleanup(void);
-void sky_draw(VkCommandBuffer cmd);          // call this instead of the old inline sky code
-void sky_update(void);                  // call every frame before drawing
+    void sky_init(void);
+    void sky_cleanup(void);
+    void sky_draw(VkCommandBuffer cmd);
+    void sky_update(void);
 #endif

@@ -1,5 +1,5 @@
+#include "pch.h"
 #ifndef __EMSCRIPTEN__
-    #include "pch.h"
     #include "rendering/device.h"
     #include "rendering/renderer_vulkan_draw.h"
     #include "scene/camera.h"

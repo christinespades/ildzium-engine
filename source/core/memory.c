@@ -1,53 +1,53 @@
-#ifndef __EMSCRIPTEN__
 #include "pch.h"
-#include "core/memory.h"
+#ifndef __EMSCRIPTEN__
+    #include "core/memory.h"
 
-extern VkDevice vk_device;
-extern VkPhysicalDevice physicalDevice;
+    extern VkDevice vk_device;
+    extern VkPhysicalDevice physicalDevice;
 
-uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memProps;
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+        VkPhysicalDeviceMemoryProperties memProps;
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
 
-    for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) &&
-            (memProps.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
+        for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) &&
+                (memProps.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
         }
-    }
 
-    printf("Failed to find suitable memory type!\n");
-    exit(1);
-}
-
-void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                                 VkBuffer* buffer, VkDeviceMemory* memory)
-{
-    VkBufferCreateInfo bufInfo = {0};
-    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufInfo.size = size;
-    bufInfo.usage = usage;
-    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(vk_device, &bufInfo, NULL, buffer) != VK_SUCCESS) {
-        printf("Failed to create buffer\n");
+        printf("Failed to find suitable memory type!\n");
         exit(1);
     }
 
-    VkMemoryRequirements memReq;
-    vkGetBufferMemoryRequirements(vk_device, *buffer, &memReq);
+    void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                                     VkBuffer* buffer, VkDeviceMemory* memory)
+    {
+        VkBufferCreateInfo bufInfo = {0};
+        bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufInfo.size = size;
+        bufInfo.usage = usage;
+        bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VkMemoryAllocateInfo allocInfo = {0};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memReq.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits,
-                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        if (vkCreateBuffer(vk_device, &bufInfo, NULL, buffer) != VK_SUCCESS) {
+            printf("Failed to create buffer\n");
+            exit(1);
+        }
 
-    if (vkAllocateMemory(vk_device, &allocInfo, NULL, memory) != VK_SUCCESS) {
-        printf("Failed to allocate buffer memory\n");
-        exit(1);
+        VkMemoryRequirements memReq;
+        vkGetBufferMemoryRequirements(vk_device, *buffer, &memReq);
+
+        VkMemoryAllocateInfo allocInfo = {0};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memReq.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits,
+                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+        if (vkAllocateMemory(vk_device, &allocInfo, NULL, memory) != VK_SUCCESS) {
+            printf("Failed to allocate buffer memory\n");
+            exit(1);
+        }
+        vkBindBufferMemory(vk_device, *buffer, *memory, 0);
     }
-    vkBindBufferMemory(vk_device, *buffer, *memory, 0);
-}
 #endif

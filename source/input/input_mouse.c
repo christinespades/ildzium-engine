@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "input_mouse.h"
 
+int mouse_wheel = 0;
 #ifndef __EMSCRIPTEN__
     float lastX = 640.0f;
     float lastY = 360.0f;
@@ -49,6 +50,12 @@ void platform_get_mouse_pos(double* x, double* y)
         g_mouse_buttons[e->button] = 0;
         return 0;
     }
+
+    EM_BOOL wheel_callback(int eventType, const EmscriptenWheelEvent* e, void* userData)
+    {
+        mouse_wheel += (int)(-e->deltaY);   // usually negative for scroll up
+        return 0;
+    }
 #else
     void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     {
@@ -92,6 +99,7 @@ void set_mouse_callbacks() {
         emscripten_set_mousemove_callback("#canvas", 0, 1, mouse_move);
         emscripten_set_mousedown_callback("#canvas", 0, 1, mouse_down);
         emscripten_set_mouseup_callback("#canvas", 0, 1, mouse_up);
+        emscripten_set_wheel_callback("#canvas", 0, 1, wheel_callback);
     #else
         glfwSetCursorPosCallback(g_window, mouse_callback);
         glfwSetScrollCallback(g_window, scroll_callback);

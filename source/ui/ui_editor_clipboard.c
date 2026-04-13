@@ -6,20 +6,6 @@
         const str = UTF8ToString(text);
         navigator.clipboard.writeText(str).catch(() => {});
     });
-
-    EM_JS(void, js_get_clipboard, (void (*cb)(const char*, void*), void* user), {
-        navigator.clipboard.readText()
-            .then(text => {
-                const len = lengthBytesUTF8(text) + 1;
-                const buf = _malloc(len);
-                stringToUTF8(text, buf, len);
-                dynCall_vii(cb, buf, user);
-                _free(buf);
-            })
-            .catch(() => {
-                dynCall_vii(cb, 0, user);
-            });
-    });
 #endif
 
 void platform_set_clipboard(const char* text)

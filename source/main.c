@@ -64,17 +64,15 @@ void engine_tick()
         mouse_wheel = 0.0;
     }
 
-    currentTime = platform_get_time();
-
+#ifdef __EMSCRIPTEN__
+    webgpu_draw();
+#else  
     if ((currentTime - last_render_time) >= (1.0 / g_target_fps))
     {
-        last_render_time = currentTime;
-    #ifdef __EMSCRIPTEN__
-        webgpu_draw();
-    #else    
+        last_render_time = currentTime;  
         vulkan_draw();
-    #endif
     }
+#endif
 }
 
 int main()
@@ -82,7 +80,7 @@ int main()
     init();
 
 #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop(engine_tick, 0, 1);
+    emscripten_set_main_loop(engine_tick, 0, 1);   // 0 = use requestAnimationFrame
 #else
     while (!platform_should_close())
     {
@@ -94,7 +92,10 @@ int main()
 
     ui_cleanup(g_ui_ctx);
     free(g_ui_ctx);
+    
+#ifndef __EMSCRIPTEN__
     platform_shutdown();
+#endif
 
     return 0;
 }

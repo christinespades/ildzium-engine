@@ -11,7 +11,7 @@ void init_input()
 }
 
 #ifndef __EMSCRIPTEN__
-    static void input_toggle_mode(GLFWwindow* window)
+    void input_toggle_mode(GLFWwindow* window)
     {
         g_ui_ctx->cursor_captured = !g_ui_ctx->cursor_captured;
 
