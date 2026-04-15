@@ -7,10 +7,10 @@ typedef enum {
 
 #ifdef __EMSCRIPTEN__
     void webgpu_init();
-    void webgpu_draw();
+    void webgpu_draw(float dt);
     void webgpu_shutdown();
 #else
     void vulkan_init();
     void vulkan_draw();
-    void vulkan_shutdown();
+    void vulkan_glfw_shutdown();
 #endif

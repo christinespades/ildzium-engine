@@ -108,8 +108,12 @@ void ui_init(UI_Context* ctx) {
     ctx->buttons = malloc(sizeof(UI_Button) * MAX_BUTTONS);
     ctx->button_held_last_frame = calloc(MAX_BUTTONS, sizeof(uint8_t)); // zero-initialized
     ctx->button_count = 0;
+#ifdef __EMSCRIPTEN__
+    ctx->cursor_captured = 1;
+#else
     ctx->cursor_captured = 0;        // start with cursor disabled (camera mode)
-
+#endif
+    
     g_ui_ctx = ctx;                    // <-- important for callbacks
     ctx->current_mode = UI_MODE_MAIN;
 
@@ -198,7 +202,7 @@ void ui_update(UI_Context* ctx, int mouse_x, int mouse_y, int mouse_pressed, int
             int pos = get_char_index_from_mouse(b, mouse_x, mouse_y);
 
             if (is_pressed) {   // mouse button is down this frame
-                double now = platform_get_time();
+                double now = ildz_get_time();
                 b->is_dragging = true;
                 b->drag_start_pos = pos;
 

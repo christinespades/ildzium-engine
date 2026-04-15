@@ -7,6 +7,7 @@
 	#define GLFW_INCLUDE_VULKAN
 	#include <GLFW/glfw3.h>
 	#include <vulkan/vulkan.h>
+	#include "stb_image.h"
 #elif defined(__EMSCRIPTEN__)
     #include <emscripten.h>
 	#include <emscripten/html5.h>

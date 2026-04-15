@@ -4,8 +4,10 @@
     #include "ui/ui.h"
 
     void vulkan_init(void);
-    void vulkan_shutdown(void);
+    void vulkan_glfw_shutdown(void);
     void vulkan_draw(void);
+    void create_swapchain();
+    void recreate_swapchain();
     extern VkDevice device;
     extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     extern void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,

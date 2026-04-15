@@ -1,14 +1,12 @@
 #if defined(__EMSCRIPTEN__)
 #include "pch.h"
-#include "rendering/device.h"
-#include "scene/camera.h"
 #include "renderer_webgpu.h"
 // in pch.h: #include <webgpu/webgpu.h>
 
 extern CameraUBO cameraUBOData;
 
 WGPUDevice device = NULL;
-
+WGPUAdapter globalAdapter = NULL;
 GPUState gpu_state = GPU_STATE_NOT_READY;
 WGPUSurface surface = NULL;
 WGPUTextureFormat swapchainFormat = WGPUTextureFormat_BGRA8Unorm;
@@ -16,10 +14,9 @@ WGPURenderPipeline pipeline = NULL;
 WGPUBuffer vertexBuffer = NULL;
 WGPUBindGroup bindGroup = NULL;
 
-static int width = 1280;
-static int height = 720;
+extern int g_width;  // in core/window.h
+extern int g_height; // in core/window.h
 
-/* Callback functions */
 static void onAdapterRequest(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* userdata1, void* userdata2);
 static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPUStringView message, void* userdata1, void* userdata2);
 
@@ -33,7 +30,6 @@ void webgpu_init(void)
         return;
     }
 
-    /* Surface from Canvas */
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvasSource = {0};
     canvasSource.chain.sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
     canvasSource.selector = (WGPUStringView){ .data = "#canvas", .length = WGPU_STRLEN };
@@ -46,7 +42,6 @@ void webgpu_init(void)
         return;
     }
 
-    /* Request Adapter */
     WGPURequestAdapterOptions adapterOpts = {0};
     adapterOpts.compatibleSurface = surface;
 
@@ -56,8 +51,6 @@ void webgpu_init(void)
     // You can pass userdata if needed (e.g., to signal completion)
 
     wgpuInstanceRequestAdapter(instance, &adapterOpts, adapterCallbackInfo);
-
-    /* === WAIT FOR ADAPTER + DEVICE === */
     gpu_state = GPU_STATE_NOT_READY;
 
     // Simple spin-wait with yielding (works great in Emscripten main loop)
@@ -76,7 +69,8 @@ static void onAdapterRequest(WGPURequestAdapterStatus status, WGPUAdapter adapte
         return;
     }
 
-    // Request device (same as before)
+    globalAdapter = adapter;
+
     WGPUDeviceDescriptor deviceDesc = {0};
     WGPURequestDeviceCallbackInfo deviceCallbackInfo = {0};
     deviceCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents;
@@ -97,14 +91,16 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     device = dev;
     queue = wgpuDeviceGetQueue(device);
 
-    /* Configure surface */
-    WGPUSurfaceConfiguration config = {0};  // zero all fields first!
+    WGPUSurfaceCapabilities caps = {0};
+    wgpuSurfaceGetCapabilities(surface, globalAdapter, &caps);
+    swapchainFormat = caps.formats[0];
 
+    WGPUSurfaceConfiguration config = {0};
     config.device       = device;
     config.format       = swapchainFormat;
     config.usage        = WGPUTextureUsage_RenderAttachment;
-    config.width        = (uint32_t)width;      // must be > 0
-    config.height       = (uint32_t)height;
+    config.width        = (uint32_t)g_width;      // must be > 0
+    config.height       = (uint32_t)g_height;
     config.presentMode  = WGPUPresentMode_Fifo;
     config.alphaMode    = WGPUCompositeAlphaMode_Opaque;   // important for Emscripten
 
@@ -112,13 +108,8 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     config.viewFormatCount = 0;
     config.viewFormats     = NULL;
 
-    if (width <= 0 || height <= 0) {
-        printf("ERROR: Invalid canvas size %dx%d before configure!\n", width, height);
-        return;
-    }
-
     wgpuSurfaceConfigure(surface, &config);
-    printf("Surface successfully configured: %d x %d\n", width, height);
+    printf("Surface successfully configured: %d x %d\n", g_width, g_height);
 
     /* Uniform buffer */
     WGPUBufferDescriptor bufDesc = {0};
@@ -150,6 +141,7 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
 
     WGPUShaderModuleDescriptor shaderDesc = {0};
     shaderDesc.nextInChain = &wgsl.chain;
+    shaderDesc.label = (WGPUStringView){ .data = "MainShader", .length = 10 };
 
     WGPUShaderModule shader = wgpuDeviceCreateShaderModule(device, &shaderDesc);
 
@@ -232,7 +224,13 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
 
     bindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
 
+    create_sky_pipeline_webgpu();
+    init_lights_webgpu(device);
+    init_model_system();
+    ui_renderer_init();
+
     gpu_state = GPU_STATE_READY;
     printf("WebGPU fully ready\n");
+
 }
 #endif

@@ -9,7 +9,7 @@ static void on_readme_loaded(char* readme, void* user)
     UI_Context* ctx = state->ctx;
 
     int w, h;
-    platform_get_window_size(&w, &h);
+    ildz_get_window_size(&w, &h);
 
     char processed[131072];
     char wrapped[131072];

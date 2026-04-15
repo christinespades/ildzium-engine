@@ -1,8 +1,52 @@
 #include "pch.h"
-#include "scene/model.h"
-#include "scene/sky.h"
-#include "ui/ui.h"
+#include "rendering/shaders.h"
 
+#ifdef __EMSCRIPTEN__
+    static void onShaderCompilation(WGPUCompilationInfoRequestStatus status, 
+                                    WGPUCompilationInfo const* info, 
+                                    void* userdata1, 
+                                    void* userdata2) {
+        const char* shaderLabel = (const char*)userdata1;
+        
+        if (status != WGPUCompilationInfoRequestStatus_Success) return;
+
+        for (uint32_t i = 0; i < info->messageCount; ++i) {
+            WGPUCompilationMessage const* m = &info->messages[i];
+            
+            // Print it clearly to the console
+            printf("[WGSL %s] %s at line %llu, col %llu: %.*s\n",
+                   shaderLabel,
+                   m->type == WGPUCompilationMessageType_Error ? "ERROR" : "WARNING",
+                   m->lineNum, m->linePos,
+                   (int)m->message.length, m->message.data);
+        }
+    }
+
+    WGPUShaderModule create_shader_module(WGPUDevice device, const char* wgslCode, const char* label) {
+        WGPUShaderSourceWGSL wgslSource = {
+            .chain = { .next = NULL, .sType = WGPUSType_ShaderSourceWGSL },
+            .code = (WGPUStringView){ .data = wgslCode, .length = WGPU_STRLEN }
+        };
+
+        WGPUShaderModuleDescriptor desc = {
+            .nextInChain = (WGPUChainedStruct*)&wgslSource,
+            .label = (WGPUStringView){ .data = label, .length = WGPU_STRLEN }
+        };
+
+        WGPUShaderModule module = wgpuDeviceCreateShaderModule(device, &desc);
+
+        WGPUCompilationInfoCallbackInfo callbackInfo = {
+            .nextInChain = NULL,
+            .mode = WGPUCallbackMode_AllowProcessEvents,
+            .callback = onShaderCompilation,
+            .userdata1 = (void*)label
+        };
+
+        wgpuShaderModuleGetCompilationInfo(module, callbackInfo);
+
+        return module;
+    }
+#else
 uint32_t* load_spirv(const char* filename, size_t* out_size)
 {
     FILE* file = fopen(filename, "rb");
@@ -79,3 +123,4 @@ void on_shader_changed(const char* path)
 
     printf("[Renderer] No pipeline mapped for: %s\n", filename);
 }
+#endif

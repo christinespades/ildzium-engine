@@ -3666,89 +3666,6 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
   var __abort_js = () =>
       abort('native code called abort()');
 
-  var _emscripten_get_now = () => performance.now();
-
-  var _emscripten_has_asyncify = () => 1;
-
-  var getHeapMax = () =>
-      // Stay one Wasm page short of 4GB: while e.g. Chrome is able to allocate
-      // full 4GB Wasm memories, the size will wrap back to 0 bytes in Wasm side
-      // for any code that deals with heap sizes, which would require special
-      // casing all heap size related code to treat 0 specially.
-      2147483648;
-  
-  var alignMemory = (size, alignment) => {
-      assert(alignment, "alignment argument is required");
-      return Math.ceil(size / alignment) * alignment;
-    };
-  
-  var growMemory = (size) => {
-      var oldHeapSize = wasmMemory.buffer.byteLength;
-      var pages = ((size - oldHeapSize + 65535) / 65536) | 0;
-      try {
-        // round size grow request up to wasm page size (fixed 64KB per spec)
-        wasmMemory.grow(pages); // .grow() takes a delta compared to the previous size
-        updateMemoryViews();
-        return 1 /*success*/;
-      } catch(e) {
-        err(`growMemory: Attempted to grow heap from ${oldHeapSize} bytes to ${size} bytes, but got error: ${e}`);
-      }
-      // implicit 0 return to save code size (caller will cast "undefined" into 0
-      // anyhow)
-    };
-  var _emscripten_resize_heap = (requestedSize) => {
-      var oldSize = HEAPU8.length;
-      // With CAN_ADDRESS_2GB or MEMORY64, pointers are already unsigned.
-      requestedSize >>>= 0;
-      // With multithreaded builds, races can happen (another thread might increase the size
-      // in between), so return a failure, and let the caller retry.
-      assert(requestedSize > oldSize);
-  
-      // Memory resize rules:
-      // 1.  Always increase heap size to at least the requested size, rounded up
-      //     to next page multiple.
-      // 2a. If MEMORY_GROWTH_LINEAR_STEP == -1, excessively resize the heap
-      //     geometrically: increase the heap size according to
-      //     MEMORY_GROWTH_GEOMETRIC_STEP factor (default +20%), At most
-      //     overreserve by MEMORY_GROWTH_GEOMETRIC_CAP bytes (default 96MB).
-      // 2b. If MEMORY_GROWTH_LINEAR_STEP != -1, excessively resize the heap
-      //     linearly: increase the heap size by at least
-      //     MEMORY_GROWTH_LINEAR_STEP bytes.
-      // 3.  Max size for the heap is capped at 2048MB-WASM_PAGE_SIZE, or by
-      //     MAXIMUM_MEMORY, or by ASAN limit, depending on which is smallest
-      // 4.  If we were unable to allocate as much memory, it may be due to
-      //     over-eager decision to excessively reserve due to (3) above.
-      //     Hence if an allocation fails, cut down on the amount of excess
-      //     growth, in an attempt to succeed to perform a smaller allocation.
-  
-      // A limit is set for how much we can grow. We should not exceed that
-      // (the wasm binary specifies it, so if we tried, we'd fail anyhow).
-      var maxHeapSize = getHeapMax();
-      if (requestedSize > maxHeapSize) {
-        err(`Cannot enlarge memory, requested ${requestedSize} bytes, but the limit is ${maxHeapSize} bytes!`);
-        return false;
-      }
-  
-      // Loop through potential heap size increases. If we attempt a too eager
-      // reservation that fails, cut down on the attempted size and reserve a
-      // smaller bump instead. (max 3 times, chosen somewhat arbitrarily)
-      for (var cutDown = 1; cutDown <= 4; cutDown *= 2) {
-        var overGrownHeapSize = oldSize * (1 + 0.2 / cutDown); // ensure geometric growth
-        // but limit overreserving (default to capping at +96MB overgrowth at most)
-        overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296 );
-  
-        var newSize = Math.min(maxHeapSize, alignMemory(Math.max(requestedSize, overGrownHeapSize), 65536));
-  
-        var replacement = growMemory(newSize);
-        if (replacement) {
-  
-          return true;
-        }
-      }
-      err(`Failed to grow the heap from ${oldSize} bytes to ${newSize} bytes, not enough memory!`);
-      return false;
-    };
-
   var onExits = [];
   var addOnExit = (cb) => onExits.push(cb);
   var JSEvents = {
@@ -3887,6 +3804,31 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       },
   };
   
+  var requestPointerLock = (target) => {
+      if (target.requestPointerLock) {
+        target.requestPointerLock();
+      } else {
+        // document.body is known to accept pointer lock, so use that to differentiate if the user passed a bad element,
+        // or if the whole browser just doesn't support the feature.
+        if (document.body.requestPointerLock) {
+          return -3;
+        }
+        return -1;
+      }
+      return 0;
+    };
+  var _emscripten_exit_pointerlock = () => {
+      // Make sure no queued up calls will fire after this.
+      JSEvents.removeDeferredCalls(requestPointerLock);
+      if (!document.exitPointerLock) return -1;
+      document.exitPointerLock();
+      return 0;
+    };
+
+  var _emscripten_get_device_pixel_ratio = () => {
+      return devicePixelRatio;
+    };
+
   var maybeCStringToJsString = (cString) => {
       // "cString > 2" checks if the input is a number, and isn't of the special
       // values we accept here, EMSCRIPTEN_EVENT_TARGET_* (which map to 0, 1, 2).
@@ -3902,6 +3844,134 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       var domElement = specialHTMLTargets[target] || document.querySelector(target);
       return domElement;
     };
+  
+  var getBoundingClientRect = (e) => specialHTMLTargets.indexOf(e) < 0 ? e.getBoundingClientRect() : {'left':0,'top':0};
+  var _emscripten_get_element_css_size = (target, width, height) => {
+      target = findEventTarget(target);
+      if (!target) return -4;
+  
+      var rect = getBoundingClientRect(target);
+      HEAPF64[((width)>>3)] = rect.width;
+      HEAPF64[((height)>>3)] = rect.height;
+  
+      return 0;
+    };
+
+  var _emscripten_get_now = () => performance.now();
+
+  var _emscripten_has_asyncify = () => 1;
+
+  
+  
+  var _emscripten_request_pointerlock = (target, deferUntilInEventHandler) => {
+      target = findEventTarget(target);
+      if (!target) return -4;
+      if (!target.requestPointerLock) {
+        return -1;
+      }
+  
+      // Queue this function call if we're not currently in an event handler and
+      // the user saw it appropriate to do so.
+      if (!JSEvents.canPerformEventHandlerRequests()) {
+        if (deferUntilInEventHandler) {
+          JSEvents.deferCall(requestPointerLock, 2 /* priority below fullscreen */, [target]);
+          return 1;
+        }
+        return -2;
+      }
+  
+      return requestPointerLock(target);
+    };
+
+  var getHeapMax = () =>
+      // Stay one Wasm page short of 4GB: while e.g. Chrome is able to allocate
+      // full 4GB Wasm memories, the size will wrap back to 0 bytes in Wasm side
+      // for any code that deals with heap sizes, which would require special
+      // casing all heap size related code to treat 0 specially.
+      2147483648;
+  
+  var alignMemory = (size, alignment) => {
+      assert(alignment, "alignment argument is required");
+      return Math.ceil(size / alignment) * alignment;
+    };
+  
+  var growMemory = (size) => {
+      var oldHeapSize = wasmMemory.buffer.byteLength;
+      var pages = ((size - oldHeapSize + 65535) / 65536) | 0;
+      try {
+        // round size grow request up to wasm page size (fixed 64KB per spec)
+        wasmMemory.grow(pages); // .grow() takes a delta compared to the previous size
+        updateMemoryViews();
+        return 1 /*success*/;
+      } catch(e) {
+        err(`growMemory: Attempted to grow heap from ${oldHeapSize} bytes to ${size} bytes, but got error: ${e}`);
+      }
+      // implicit 0 return to save code size (caller will cast "undefined" into 0
+      // anyhow)
+    };
+  var _emscripten_resize_heap = (requestedSize) => {
+      var oldSize = HEAPU8.length;
+      // With CAN_ADDRESS_2GB or MEMORY64, pointers are already unsigned.
+      requestedSize >>>= 0;
+      // With multithreaded builds, races can happen (another thread might increase the size
+      // in between), so return a failure, and let the caller retry.
+      assert(requestedSize > oldSize);
+  
+      // Memory resize rules:
+      // 1.  Always increase heap size to at least the requested size, rounded up
+      //     to next page multiple.
+      // 2a. If MEMORY_GROWTH_LINEAR_STEP == -1, excessively resize the heap
+      //     geometrically: increase the heap size according to
+      //     MEMORY_GROWTH_GEOMETRIC_STEP factor (default +20%), At most
+      //     overreserve by MEMORY_GROWTH_GEOMETRIC_CAP bytes (default 96MB).
+      // 2b. If MEMORY_GROWTH_LINEAR_STEP != -1, excessively resize the heap
+      //     linearly: increase the heap size by at least
+      //     MEMORY_GROWTH_LINEAR_STEP bytes.
+      // 3.  Max size for the heap is capped at 2048MB-WASM_PAGE_SIZE, or by
+      //     MAXIMUM_MEMORY, or by ASAN limit, depending on which is smallest
+      // 4.  If we were unable to allocate as much memory, it may be due to
+      //     over-eager decision to excessively reserve due to (3) above.
+      //     Hence if an allocation fails, cut down on the amount of excess
+      //     growth, in an attempt to succeed to perform a smaller allocation.
+  
+      // A limit is set for how much we can grow. We should not exceed that
+      // (the wasm binary specifies it, so if we tried, we'd fail anyhow).
+      var maxHeapSize = getHeapMax();
+      if (requestedSize > maxHeapSize) {
+        err(`Cannot enlarge memory, requested ${requestedSize} bytes, but the limit is ${maxHeapSize} bytes!`);
+        return false;
+      }
+  
+      // Loop through potential heap size increases. If we attempt a too eager
+      // reservation that fails, cut down on the attempted size and reserve a
+      // smaller bump instead. (max 3 times, chosen somewhat arbitrarily)
+      for (var cutDown = 1; cutDown <= 4; cutDown *= 2) {
+        var overGrownHeapSize = oldSize * (1 + 0.2 / cutDown); // ensure geometric growth
+        // but limit overreserving (default to capping at +96MB overgrowth at most)
+        overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296 );
+  
+        var newSize = Math.min(maxHeapSize, alignMemory(Math.max(requestedSize, overGrownHeapSize), 65536));
+  
+        var replacement = growMemory(newSize);
+        if (replacement) {
+  
+          return true;
+        }
+      }
+      err(`Failed to grow the heap from ${oldSize} bytes to ${newSize} bytes, not enough memory!`);
+      return false;
+    };
+
+  var findCanvasEventTarget = findEventTarget;
+  var _emscripten_set_canvas_element_size = (target, width, height) => {
+      var canvas = findCanvasEventTarget(target);
+      if (!canvas) return -4;
+      canvas.width = width;
+      canvas.height = height;
+      return 0;
+    };
+
+  
   
   var stringToUTF8 = (str, outPtr, maxBytesToWrite) => {
       assert(typeof maxBytesToWrite == 'number', 'stringToUTF8(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!');
@@ -3950,6 +4020,9 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
     };
   var _emscripten_set_keydown_callback_on_thread = (target, userData, useCapture, callbackfunc, targetThread) =>
       registerKeyEventCallback(target, userData, useCapture, callbackfunc, 2, "keydown", targetThread);
+
+  var _emscripten_set_keypress_callback_on_thread = (target, userData, useCapture, callbackfunc, targetThread) =>
+      registerKeyEventCallback(target, userData, useCapture, callbackfunc, 1, "keypress", targetThread);
 
   var _emscripten_set_keyup_callback_on_thread = (target, userData, useCapture, callbackfunc, targetThread) =>
       registerKeyEventCallback(target, userData, useCapture, callbackfunc, 3, "keyup", targetThread);
@@ -4268,7 +4341,6 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
     };
 
   
-  var getBoundingClientRect = (e) => specialHTMLTargets.indexOf(e) < 0 ? e.getBoundingClientRect() : {'left':0,'top':0};
   var fillMouseEventData = (eventStruct, e, target) => {
       assert(eventStruct % 4 == 0);
       HEAPF64[((eventStruct)>>3)] = e.timeStamp;
@@ -4327,6 +4399,54 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
 
   var _emscripten_set_mouseup_callback_on_thread = (target, userData, useCapture, callbackfunc, targetThread) =>
       registerMouseEventCallback(target, userData, useCapture, callbackfunc, 6, "mouseup", targetThread);
+
+  
+  
+  var registerUiEventCallback = (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString, targetThread) => {
+      var eventSize = 36;
+      JSEvents.uiEvent ||= _malloc(eventSize);
+  
+      target = findEventTarget(target);
+  
+      var uiEventHandlerFunc = (e) => {
+        if (e.target != target) {
+          // Never take ui events such as scroll via a 'bubbled' route, but always from the direct element that
+          // was targeted. Otherwise e.g. if app logs a message in response to a page scroll, the Emscripten log
+          // message box could cause to scroll, generating a new (bubbled) scroll message, causing a new log print,
+          // causing a new scroll, etc..
+          return;
+        }
+        var b = document.body; // Take document.body to a variable, Closure compiler does not outline access to it on its own.
+        if (!b) {
+          // During a page unload 'body' can be null, with "Cannot read property 'clientWidth' of null" being thrown
+          return;
+        }
+        var uiEvent = JSEvents.uiEvent;
+        HEAP32[((uiEvent)>>2)] = 0; // always zero for resize and scroll
+        HEAP32[(((uiEvent)+(4))>>2)] = b.clientWidth;
+        HEAP32[(((uiEvent)+(8))>>2)] = b.clientHeight;
+        HEAP32[(((uiEvent)+(12))>>2)] = innerWidth;
+        HEAP32[(((uiEvent)+(16))>>2)] = innerHeight;
+        HEAP32[(((uiEvent)+(20))>>2)] = outerWidth;
+        HEAP32[(((uiEvent)+(24))>>2)] = outerHeight;
+        HEAP32[(((uiEvent)+(28))>>2)] = pageXOffset | 0; // scroll offsets are float
+        HEAP32[(((uiEvent)+(32))>>2)] = pageYOffset | 0;
+        if (((a1, a2, a3) => dynCall_iiii(callbackfunc, a1, a2, a3))(eventTypeId, uiEvent, userData)) e.preventDefault();
+      };
+  
+      var eventHandler = {
+        target,
+        eventTypeString,
+        eventTypeId,
+        userData,
+        callbackfunc,
+        handlerFunc: uiEventHandlerFunc,
+        useCapture
+      };
+      return JSEvents.registerOrRemoveHandler(eventHandler);
+    };
+  var _emscripten_set_resize_callback_on_thread = (target, userData, useCapture, callbackfunc, targetThread) =>
+      registerUiEventCallback(target, userData, useCapture, callbackfunc, 10, "resize", targetThread);
 
   
   
@@ -5268,6 +5388,16 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       device.destroy()
     };
 
+  var emwgpuStringToInt_PreferredFormat = {
+              'rgba8unorm': 22,
+              'bgra8unorm': 27,
+          };
+  
+  var _emwgpuGetPreferredFormat = () => {
+      var format = navigator.gpu.getPreferredCanvasFormat();
+      return emwgpuStringToInt_PreferredFormat[format];
+    };
+
   
   
   
@@ -5335,6 +5465,94 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       }));
     ;
   }
+
+  
+  
+  
+  
+  var emwgpuStringToInt_CompilationMessageType = {
+              'error': 1,
+              'warning': 2,
+              'info': 3,
+          };
+  
+  
+  
+  var _emwgpuShaderModuleGetCompilationInfo = function(shaderModulePtr, futureId, compilationInfoPtr) {
+    futureId = bigintToI53Checked(futureId);
+  
+  
+      var shaderModule = WebGPU.getJsObject(shaderModulePtr);
+       // getCompilationInfo
+      WebGPU.Internals.futureInsert(futureId, shaderModule.getCompilationInfo().then((compilationInfo) => {
+         // getCompilationInfo fulfilled (assumed not to reject)
+        callUserCallback(() => {
+          const messageCount = compilationInfo.messages.length;
+          HEAPU32[(((compilationInfoPtr)+(4))>>2)] = messageCount
+  
+          // If there are messages, allocate and initialize them.
+          // TODO(crbug.com/377760848): This giant if-block makes the function hard to read. See if
+          // there's a way to factor out the initialization of compilationInfoPtr without increasing
+          // code size significantly.
+          if (messageCount) {
+            // Calculate the total length of strings and offsets here to malloc them
+            // all at once. Note that we start at 1 instead of 0 for the total size
+            // to ensure there's enough space for the null terminator that is always
+            // added by stringToUTF8.
+            var totalMessagesSize = 1;
+            var messageLengths = [];
+            for (var i = 0; i < messageCount; ++i) {
+              var messageLength = lengthBytesUTF8(compilationInfo.messages[i].message);
+              totalMessagesSize += messageLength;
+              messageLengths.push(messageLength);
+            }
+            var messagesPtr = _malloc(totalMessagesSize);
+  
+            // Allocate space for all WGPUCompilationMessage values.
+            var compilationMessagesPtr = _malloc(48 * messageCount);
+            HEAPU32[(((compilationInfoPtr)+(8))>>2)] = compilationMessagesPtr;
+            // Allocate space for all WGPUDawnCompilationMessageUtf16 values.
+            var utf16sPtr = _malloc(32 * messageCount);
+            // Fill in the arrays and link the pointers.
+            for (var i = 0; i < messageCount; ++i) {
+              var compilationMessage = compilationInfo.messages[i];
+              var compilationMessagePtr = compilationMessagesPtr + 48 * i;
+              var utf16Ptr = utf16sPtr + 32 * i;
+  
+              // Write out the values to the CompilationMessage.
+              WebGPU.setStringView(compilationMessagePtr + 4, messagesPtr, messageLengths[i]);
+              // TODO(crbug.com/435488557): Convert JavaScript's UTF-16-code-unit offsets to
+              // UTF-8-code-unit offsets. https://github.com/webgpu-native/webgpu-headers/issues/246
+              HEAPU32[((compilationMessagePtr)>>2)] = utf16Ptr;
+              HEAP32[(((compilationMessagePtr)+(12))>>2)] = emwgpuStringToInt_CompilationMessageType[compilationMessage.type];
+              HEAP64[(((compilationMessagePtr)+(16))>>3)] = BigInt(compilationMessage.lineNum);
+              HEAP64[(((compilationMessagePtr)+(24))>>3)] = BigInt(compilationMessage.linePos);
+              HEAP64[(((compilationMessagePtr)+(32))>>3)] = BigInt(compilationMessage.offset);
+              HEAP64[(((compilationMessagePtr)+(40))>>3)] = BigInt(compilationMessage.length);
+  
+              HEAPU32[((utf16Ptr)>>2)] = 0;
+              HEAP32[(((utf16Ptr)+(4))>>2)] = 327743;
+              HEAP64[(((utf16Ptr)+(8))>>3)] = BigInt(compilationMessage.linePos);
+              HEAP64[(((utf16Ptr)+(16))>>3)] = BigInt(compilationMessage.offset);
+              HEAP64[(((utf16Ptr)+(24))>>3)] = BigInt(compilationMessage.length);
+  
+              // Write the string out to the allocated buffer. Note we have to add 1
+              // to the length of the string to ensure enough space for the null
+              // terminator. However, we only increment the pointer by the exact
+              // length so we overwrite the null terminators except for the last one.
+              stringToUTF8(compilationMessage.message, messagesPtr, messageLengths[i] + 1);
+              messagesPtr += messageLengths[i];
+            }
+          }
+  
+          _emwgpuOnCompilationInfoCompleted(futureId, 1,
+            compilationInfoPtr);
+        });
+      }, () => {
+        abort('Unexpected failure in GPUShaderModule.getCompilationInfo().')
+      }));
+    ;
+  };
 
   function _fd_close(fd) {
   try {
@@ -5828,7 +6046,72 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       return ptr;
     };
 
-  var findCanvasEventTarget = findEventTarget;
+  
+  var _wgpuDeviceCreateSampler = (devicePtr, descriptor) => {
+      var desc;
+      if (descriptor) {
+        assert(descriptor);assert(HEAPU32[((descriptor)>>2)] === 0);
+  
+        desc = {
+          "label": WebGPU.makeStringFromOptionalStringView(
+            descriptor + 4),
+          "addressModeU": WebGPU.AddressMode[
+              HEAPU32[(((descriptor)+(12))>>2)]],
+          "addressModeV": WebGPU.AddressMode[
+              HEAPU32[(((descriptor)+(16))>>2)]],
+          "addressModeW": WebGPU.AddressMode[
+              HEAPU32[(((descriptor)+(20))>>2)]],
+          "magFilter": WebGPU.FilterMode[
+              HEAPU32[(((descriptor)+(24))>>2)]],
+          "minFilter": WebGPU.FilterMode[
+              HEAPU32[(((descriptor)+(28))>>2)]],
+          "mipmapFilter": WebGPU.MipmapFilterMode[
+              HEAPU32[(((descriptor)+(32))>>2)]],
+          "lodMinClamp": HEAPF32[(((descriptor)+(36))>>2)],
+          "lodMaxClamp": HEAPF32[(((descriptor)+(40))>>2)],
+          "compare": WebGPU.CompareFunction[
+              HEAPU32[(((descriptor)+(44))>>2)]],
+          "maxAnisotropy": HEAPU16[(((descriptor)+(48))>>1)],
+        };
+      }
+  
+      var device = WebGPU.getJsObject(devicePtr);
+      var ptr = _emwgpuCreateSampler(0);
+      WebGPU.Internals.jsObjectInsert(ptr, device.createSampler(desc));
+      return ptr;
+    };
+
+  
+  var _wgpuDeviceCreateTexture = (devicePtr, descriptor) => {
+      assert(descriptor);assert(HEAPU32[((descriptor)>>2)] === 0);
+  
+      var desc = {
+        "label": WebGPU.makeStringFromOptionalStringView(
+          descriptor + 4),
+        "size": WebGPU.makeExtent3D(descriptor + 28),
+        "mipLevelCount": HEAPU32[(((descriptor)+(44))>>2)],
+        "sampleCount": HEAPU32[(((descriptor)+(48))>>2)],
+        "dimension": WebGPU.TextureDimension[
+          HEAPU32[(((descriptor)+(24))>>2)]],
+        "format": WebGPU.TextureFormat[
+          HEAPU32[(((descriptor)+(40))>>2)]],
+        "usage": HEAPU32[(((descriptor)+(16))>>2)],
+      };
+  
+      var viewFormatCount = HEAPU32[(((descriptor)+(52))>>2)];
+      if (viewFormatCount) {
+        var viewFormatsPtr = HEAPU32[(((descriptor)+(56))>>2)];
+        // viewFormatsPtr pointer to an array of TextureFormat which is an enum of size uint32_t
+        desc['viewFormats'] = Array.from(HEAP32.subarray((((viewFormatsPtr)>>2)), ((viewFormatsPtr + viewFormatCount * 4)>>2)),
+          format => WebGPU.TextureFormat[format]);
+      }
+  
+      var device = WebGPU.getJsObject(devicePtr);
+      var ptr = _emwgpuCreateTexture(0);
+      WebGPU.Internals.jsObjectInsert(ptr, device.createTexture(desc));
+      return ptr;
+    };
+
   
   
   var _wgpuInstanceCreateSurface = (instancePtr, descriptor) => {
@@ -5878,6 +6161,18 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
     ;
   }
 
+  var _wgpuQueueWriteTexture = (queuePtr, destinationPtr, data, dataSize, dataLayoutPtr, writeSizePtr) => {
+      var queue = WebGPU.getJsObject(queuePtr);
+  
+      var destination = WebGPU.makeTexelCopyTextureInfo(destinationPtr);
+      var dataLayout = WebGPU.makeTexelCopyBufferLayout(dataLayoutPtr);
+      var writeSize = WebGPU.makeExtent3D(writeSizePtr);
+      // This subarray isn't strictly necessary, but helps work around an issue
+      // where Chromium makes a copy of the entire heap. crbug.com/1134457
+      var subarray = HEAPU8.subarray(data, data + dataSize);
+      queue.writeTexture(destination, subarray, dataLayout, writeSize);
+    };
+
   var _wgpuRenderPassEncoderDraw = (passPtr, vertexCount, instanceCount, firstVertex, firstInstance) => {
       assert(vertexCount >= 0);
       assert(instanceCount >= 0);
@@ -5922,6 +6217,15 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       pass.setVertexBuffer(slot, buffer, offset, size);
     ;
   }
+
+  
+  var _wgpuRenderPipelineGetBindGroupLayout = (pipelinePtr, groupIndex) => {
+      assert(groupIndex >= 0);
+      var pipeline = WebGPU.getJsObject(pipelinePtr);
+      var ptr = _emwgpuCreateBindGroupLayout(0);
+      WebGPU.Internals.jsObjectInsert(ptr, pipeline.getBindGroupLayout(groupIndex));
+      return ptr;
+    };
 
   var _wgpuSurfaceConfigure = (surfacePtr, config) => {
       assert(config);
@@ -6027,12 +6331,6 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       var ptr = _emwgpuCreateTextureView(0);
       WebGPU.Internals.jsObjectInsert(ptr, texture.createView(desc));
       return ptr;
-    };
-
-  var _wgpuTextureGetFormat = (texturePtr) => {
-      var texture = WebGPU.getJsObject(texturePtr);
-      // Should return the enum integer instead of string.
-      return WebGPU.TextureFormat.indexOf(texture.format);
     };
 
 
@@ -6419,509 +6717,6 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       return (...args) => ccall(ident, returnType, argTypes, args, opts);
     };
 
-  
-  function getFullscreenElement() {
-      return document.fullscreenElement || document.mozFullScreenElement ||
-             document.webkitFullscreenElement || document.webkitCurrentFullScreenElement ||
-             document.msFullscreenElement;
-    }
-  
-  /** @param {number=} timeout */
-  var safeSetTimeout = (func, timeout) => {
-      
-      return setTimeout(() => {
-        
-        callUserCallback(func);
-      }, timeout);
-    };
-  
-  
-  
-  var Browser = {
-  useWebGL:false,
-  isFullscreen:false,
-  pointerLock:false,
-  moduleContextCreatedCallbacks:[],
-  workers:[],
-  preloadedImages:{
-  },
-  preloadedAudios:{
-  },
-  getCanvas:() => Module['canvas'],
-  init() {
-        if (Browser.initted) return;
-        Browser.initted = true;
-  
-        // Support for plugins that can process preloaded files. You can add more of these to
-        // your app by creating and appending to preloadPlugins.
-        //
-        // Each plugin is asked if it can handle a file based on the file's name. If it can,
-        // it is given the file's raw data. When it is done, it calls a callback with the file's
-        // (possibly modified) data. For example, a plugin might decompress a file, or it
-        // might create some side data structure for use later (like an Image element, etc.).
-  
-        var imagePlugin = {};
-        imagePlugin['canHandle'] = (name) => {
-          return !Module['noImageDecoding'] && /\.(jpg|jpeg|png|bmp|webp)$/i.test(name);
-        };
-        imagePlugin['handle'] = async (byteArray, name) => {
-          var b = new Blob([byteArray], { type: Browser.getMimetype(name) });
-          if (b.size !== byteArray.length) { // Safari bug #118630
-            // Safari's Blob can only take an ArrayBuffer
-            b = new Blob([(new Uint8Array(byteArray)).buffer], { type: Browser.getMimetype(name) });
-          }
-          var url = URL.createObjectURL(b);
-          return new Promise((resolve, reject) => {
-            var img = new Image();
-            img.onload = () => {
-              assert(img.complete, `Image ${name} could not be decoded`);
-              var canvas = /** @type {!HTMLCanvasElement} */ (document.createElement('canvas'));
-              canvas.width = img.width;
-              canvas.height = img.height;
-              var ctx = canvas.getContext('2d');
-              ctx.drawImage(img, 0, 0);
-              Browser.preloadedImages[name] = canvas;
-              URL.revokeObjectURL(url);
-              resolve(byteArray);
-            };
-            img.onerror = (event) => {
-              err(`Image ${url} could not be decoded`);
-              reject();
-            };
-            img.src = url;
-          });
-        };
-        preloadPlugins.push(imagePlugin);
-  
-        var audioPlugin = {};
-        audioPlugin['canHandle'] = (name) => {
-          return !Module['noAudioDecoding'] && name.slice(-4) in { '.ogg': 1, '.wav': 1, '.mp3': 1 };
-        };
-        audioPlugin['handle'] = async (byteArray, name) => {
-          return new Promise((resolve, reject) => {
-            var done = false;
-            function finish(audio) {
-              if (done) return;
-              done = true;
-              Browser.preloadedAudios[name] = audio;
-              resolve(byteArray);
-            }
-            var b = new Blob([byteArray], { type: Browser.getMimetype(name) });
-            var url = URL.createObjectURL(b); // XXX we never revoke this!
-            var audio = new Audio();
-            audio.addEventListener('canplaythrough', () => finish(audio), false); // use addEventListener due to chromium bug 124926
-            audio.onerror = (event) => {
-              if (done) return;
-              err(`warning: browser could not fully decode audio ${name}, trying slower base64 approach`);
-              function encode64(data) {
-                var BASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-                var PAD = '=';
-                var ret = '';
-                var leftchar = 0;
-                var leftbits = 0;
-                for (var i = 0; i < data.length; i++) {
-                  leftchar = (leftchar << 8) | data[i];
-                  leftbits += 8;
-                  while (leftbits >= 6) {
-                    var curr = (leftchar >> (leftbits-6)) & 0x3f;
-                    leftbits -= 6;
-                    ret += BASE[curr];
-                  }
-                }
-                if (leftbits == 2) {
-                  ret += BASE[(leftchar&3) << 4];
-                  ret += PAD + PAD;
-                } else if (leftbits == 4) {
-                  ret += BASE[(leftchar&0xf) << 2];
-                  ret += PAD;
-                }
-                return ret;
-              }
-              audio.src = 'data:audio/x-' + name.slice(-3) + ';base64,' + encode64(byteArray);
-              finish(audio); // we don't wait for confirmation this worked - but it's worth trying
-            };
-            audio.src = url;
-            // workaround for chrome bug 124926 - we do not always get oncanplaythrough or onerror
-            safeSetTimeout(() => {
-              finish(audio); // try to use it even though it is not necessarily ready to play
-            }, 10000);
-          });
-        };
-        preloadPlugins.push(audioPlugin);
-  
-        // Canvas event setup
-  
-        function pointerLockChange() {
-          var canvas = Browser.getCanvas();
-          Browser.pointerLock = document.pointerLockElement === canvas;
-        }
-        var canvas = Browser.getCanvas();
-        if (canvas) {
-          // forced aspect ratio can be enabled by defining 'forcedAspectRatio' on Module
-          // Module['forcedAspectRatio'] = 4 / 3;
-  
-          document.addEventListener('pointerlockchange', pointerLockChange, false);
-  
-          if (Module['elementPointerLock']) {
-            canvas.addEventListener("click", (ev) => {
-              if (!Browser.pointerLock && Browser.getCanvas().requestPointerLock) {
-                Browser.getCanvas().requestPointerLock();
-                ev.preventDefault();
-              }
-            }, false);
-          }
-        }
-      },
-  createContext(/** @type {HTMLCanvasElement} */ canvas, useWebGL, setInModule, webGLContextAttributes) {
-        if (useWebGL && Module['ctx'] && canvas == Browser.getCanvas()) return Module['ctx']; // no need to recreate GL context if it's already been created for this canvas.
-  
-        var ctx;
-        var contextHandle;
-        if (useWebGL) {
-          // For GLES2/desktop GL compatibility, adjust a few defaults to be different to WebGL defaults, so that they align better with the desktop defaults.
-          var contextAttributes = {
-            antialias: false,
-            alpha: false,
-            majorVersion: (typeof WebGL2RenderingContext != 'undefined') ? 2 : 1,
-          };
-  
-          if (webGLContextAttributes) {
-            for (var attribute in webGLContextAttributes) {
-              contextAttributes[attribute] = webGLContextAttributes[attribute];
-            }
-          }
-  
-          // This check of existence of GL is here to satisfy Closure compiler, which yells if variable GL is referenced below but GL object is not
-          // actually compiled in because application is not doing any GL operations. TODO: Ideally if GL is not being used, this function
-          // Browser.createContext() should not even be emitted.
-          if (typeof GL != 'undefined') {
-            contextHandle = GL.createContext(canvas, contextAttributes);
-            if (contextHandle) {
-              ctx = GL.getContext(contextHandle).GLctx;
-            }
-          }
-        } else {
-          ctx = canvas.getContext('2d');
-        }
-  
-        if (!ctx) return null;
-  
-        if (setInModule) {
-          if (!useWebGL) assert(typeof GLctx == 'undefined', 'cannot set in module if GLctx is used, but we are a non-GL context that would replace it');
-          Module['ctx'] = ctx;
-          if (useWebGL) GL.makeContextCurrent(contextHandle);
-          Browser.useWebGL = useWebGL;
-          Browser.moduleContextCreatedCallbacks.forEach((callback) => callback());
-          Browser.init();
-        }
-        return ctx;
-      },
-  fullscreenHandlersInstalled:false,
-  lockPointer:undefined,
-  resizeCanvas:undefined,
-  requestFullscreen(lockPointer, resizeCanvas) {
-        Browser.lockPointer = lockPointer;
-        Browser.resizeCanvas = resizeCanvas;
-        if (typeof Browser.lockPointer == 'undefined') Browser.lockPointer = true;
-        if (typeof Browser.resizeCanvas == 'undefined') Browser.resizeCanvas = false;
-  
-        var canvas = Browser.getCanvas();
-        function fullscreenChange() {
-          Browser.isFullscreen = false;
-          var canvasContainer = canvas.parentNode;
-          if (getFullscreenElement() === canvasContainer) {
-            canvas.exitFullscreen = Browser.exitFullscreen;
-            if (Browser.lockPointer) canvas.requestPointerLock();
-            Browser.isFullscreen = true;
-            if (Browser.resizeCanvas) {
-              Browser.setFullscreenCanvasSize();
-            } else {
-              Browser.updateCanvasDimensions(canvas);
-            }
-          } else {
-            // remove the full screen specific parent of the canvas again to restore the HTML structure from before going full screen
-            canvasContainer.parentNode.insertBefore(canvas, canvasContainer);
-            canvasContainer.parentNode.removeChild(canvasContainer);
-  
-            if (Browser.resizeCanvas) {
-              Browser.setWindowedCanvasSize();
-            } else {
-              Browser.updateCanvasDimensions(canvas);
-            }
-          }
-          Module['onFullScreen']?.(Browser.isFullscreen);
-          Module['onFullscreen']?.(Browser.isFullscreen);
-        }
-  
-        if (!Browser.fullscreenHandlersInstalled) {
-          Browser.fullscreenHandlersInstalled = true;
-          document.addEventListener('fullscreenchange', fullscreenChange, false);
-          document.addEventListener('mozfullscreenchange', fullscreenChange, false);
-          document.addEventListener('webkitfullscreenchange', fullscreenChange, false);
-          document.addEventListener('MSFullscreenChange', fullscreenChange, false);
-        }
-  
-        // create a new parent to ensure the canvas has no siblings. this allows browsers to optimize full screen performance when its parent is the full screen root
-        var canvasContainer = document.createElement("div");
-        canvas.parentNode.insertBefore(canvasContainer, canvas);
-        canvasContainer.appendChild(canvas);
-  
-        // use parent of canvas as full screen root to allow aspect ratio correction (Firefox stretches the root to screen size)
-        canvasContainer.requestFullscreen = canvasContainer['requestFullscreen'] ||
-                                            canvasContainer['mozRequestFullScreen'] ||
-                                            canvasContainer['msRequestFullscreen'] ||
-                                           (canvasContainer['webkitRequestFullscreen'] ? () => canvasContainer['webkitRequestFullscreen'](Element['ALLOW_KEYBOARD_INPUT']) : null) ||
-                                           (canvasContainer['webkitRequestFullScreen'] ? () => canvasContainer['webkitRequestFullScreen'](Element['ALLOW_KEYBOARD_INPUT']) : null);
-  
-        canvasContainer.requestFullscreen();
-      },
-  requestFullScreen() {
-        abort('Module.requestFullScreen has been replaced by Module.requestFullscreen (without a capital S)');
-      },
-  exitFullscreen() {
-        // This is workaround for chrome. Trying to exit from fullscreen
-        // not in fullscreen state will cause "TypeError: Document not active"
-        // in chrome. See https://github.com/emscripten-core/emscripten/pull/8236
-        if (!Browser.isFullscreen) {
-          return false;
-        }
-  
-        var CFS = document['exitFullscreen'] ||
-                  document['cancelFullScreen'] ||
-                  document['mozCancelFullScreen'] ||
-                  document['msExitFullscreen'] ||
-                  document['webkitCancelFullScreen'] ||
-            (() => {});
-        CFS.apply(document, []);
-        return true;
-      },
-  safeSetTimeout(func, timeout) {
-        // Legacy function, this is used by the SDL2 port so we need to keep it
-        // around at least until that is updated.
-        // See https://github.com/libsdl-org/SDL/pull/6304
-        return safeSetTimeout(func, timeout);
-      },
-  getMimetype(name) {
-        return {
-          'jpg': 'image/jpeg',
-          'jpeg': 'image/jpeg',
-          'png': 'image/png',
-          'bmp': 'image/bmp',
-          'ogg': 'audio/ogg',
-          'wav': 'audio/wav',
-          'mp3': 'audio/mpeg'
-        }[name.slice(name.lastIndexOf('.')+1)];
-      },
-  getUserMedia(func) {
-        window.getUserMedia ||= navigator['getUserMedia'] ||
-                                navigator['mozGetUserMedia'];
-        window.getUserMedia(func);
-      },
-  getMovementX(event) {
-        return event['movementX'] ||
-               event['mozMovementX'] ||
-               event['webkitMovementX'] ||
-               0;
-      },
-  getMovementY(event) {
-        return event['movementY'] ||
-               event['mozMovementY'] ||
-               event['webkitMovementY'] ||
-               0;
-      },
-  getMouseWheelDelta(event) {
-        var delta = 0;
-        switch (event.type) {
-          case 'DOMMouseScroll':
-            // 3 lines make up a step
-            delta = event.detail / 3;
-            break;
-          case 'mousewheel':
-            // 120 units make up a step
-            delta = event.wheelDelta / 120;
-            break;
-          case 'wheel':
-            delta = event.deltaY
-            switch (event.deltaMode) {
-              case 0:
-                // DOM_DELTA_PIXEL: 100 pixels make up a step
-                delta /= 100;
-                break;
-              case 1:
-                // DOM_DELTA_LINE: 3 lines make up a step
-                delta /= 3;
-                break;
-              case 2:
-                // DOM_DELTA_PAGE: A page makes up 80 steps
-                delta *= 80;
-                break;
-              default:
-                abort('unrecognized mouse wheel delta mode: ' + event.deltaMode);
-            }
-            break;
-          default:
-            abort('unrecognized mouse wheel event: ' + event.type);
-        }
-        return delta;
-      },
-  mouseX:0,
-  mouseY:0,
-  mouseMovementX:0,
-  mouseMovementY:0,
-  touches:{
-  },
-  lastTouches:{
-  },
-  calculateMouseCoords(pageX, pageY) {
-        // Calculate the movement based on the changes
-        // in the coordinates.
-        var canvas = Browser.getCanvas();
-        var rect = canvas.getBoundingClientRect();
-  
-        // Neither .scrollX or .pageXOffset are defined in a spec, but
-        // we prefer .scrollX because it is currently in a spec draft.
-        // (see: http://www.w3.org/TR/2013/WD-cssom-view-20131217/)
-        var scrollX = ((typeof window.scrollX != 'undefined') ? window.scrollX : window.pageXOffset);
-        var scrollY = ((typeof window.scrollY != 'undefined') ? window.scrollY : window.pageYOffset);
-        // If this assert lands, it's likely because the browser doesn't support scrollX or pageXOffset
-        // and we have no viable fallback.
-        assert((typeof scrollX != 'undefined') && (typeof scrollY != 'undefined'), 'Unable to retrieve scroll position, mouse positions likely broken.');
-        var adjustedX = pageX - (scrollX + rect.left);
-        var adjustedY = pageY - (scrollY + rect.top);
-  
-        // the canvas might be CSS-scaled compared to its backbuffer;
-        // SDL-using content will want mouse coordinates in terms
-        // of backbuffer units.
-        adjustedX = adjustedX * (canvas.width / rect.width);
-        adjustedY = adjustedY * (canvas.height / rect.height);
-  
-        return { x: adjustedX, y: adjustedY };
-      },
-  setMouseCoords(pageX, pageY) {
-        const {x, y} = Browser.calculateMouseCoords(pageX, pageY);
-        Browser.mouseMovementX = x - Browser.mouseX;
-        Browser.mouseMovementY = y - Browser.mouseY;
-        Browser.mouseX = x;
-        Browser.mouseY = y;
-      },
-  calculateMouseEvent(event) { // event should be mousemove, mousedown or mouseup
-        if (Browser.pointerLock) {
-          // When the pointer is locked, calculate the coordinates
-          // based on the movement of the mouse.
-          // Workaround for Firefox bug 764498
-          if (event.type != 'mousemove' &&
-              ('mozMovementX' in event)) {
-            Browser.mouseMovementX = Browser.mouseMovementY = 0;
-          } else {
-            Browser.mouseMovementX = Browser.getMovementX(event);
-            Browser.mouseMovementY = Browser.getMovementY(event);
-          }
-  
-          // add the mouse delta to the current absolute mouse position
-          Browser.mouseX += Browser.mouseMovementX;
-          Browser.mouseY += Browser.mouseMovementY;
-        } else {
-          if (event.type === 'touchstart' || event.type === 'touchend' || event.type === 'touchmove') {
-            var touch = event.touch;
-            if (touch === undefined) {
-              return; // the "touch" property is only defined in SDL
-  
-            }
-            var coords = Browser.calculateMouseCoords(touch.pageX, touch.pageY);
-  
-            if (event.type === 'touchstart') {
-              Browser.lastTouches[touch.identifier] = coords;
-              Browser.touches[touch.identifier] = coords;
-            } else if (event.type === 'touchend' || event.type === 'touchmove') {
-              var last = Browser.touches[touch.identifier];
-              last ||= coords;
-              Browser.lastTouches[touch.identifier] = last;
-              Browser.touches[touch.identifier] = coords;
-            }
-            return;
-          }
-  
-          Browser.setMouseCoords(event.pageX, event.pageY);
-        }
-      },
-  resizeListeners:[],
-  updateResizeListeners() {
-        var canvas = Browser.getCanvas();
-        Browser.resizeListeners.forEach((listener) => listener(canvas.width, canvas.height));
-      },
-  setCanvasSize(width, height, noUpdates) {
-        var canvas = Browser.getCanvas();
-        Browser.updateCanvasDimensions(canvas, width, height);
-        if (!noUpdates) Browser.updateResizeListeners();
-      },
-  windowedWidth:0,
-  windowedHeight:0,
-  setFullscreenCanvasSize() {
-        // check if SDL is available
-        if (typeof SDL != "undefined") {
-          var flags = HEAPU32[((SDL.screen)>>2)];
-          flags = flags | 0x00800000; // set SDL_FULLSCREEN flag
-          HEAP32[((SDL.screen)>>2)] = flags;
-        }
-        Browser.updateCanvasDimensions(Browser.getCanvas());
-        Browser.updateResizeListeners();
-      },
-  setWindowedCanvasSize() {
-        // check if SDL is available
-        if (typeof SDL != "undefined") {
-          var flags = HEAPU32[((SDL.screen)>>2)];
-          flags = flags & ~0x00800000; // clear SDL_FULLSCREEN flag
-          HEAP32[((SDL.screen)>>2)] = flags;
-        }
-        Browser.updateCanvasDimensions(Browser.getCanvas());
-        Browser.updateResizeListeners();
-      },
-  updateCanvasDimensions(canvas, wNative, hNative) {
-        if (wNative && hNative) {
-          canvas.widthNative = wNative;
-          canvas.heightNative = hNative;
-        } else {
-          wNative = canvas.widthNative;
-          hNative = canvas.heightNative;
-        }
-        var w = wNative;
-        var h = hNative;
-        if (Module['forcedAspectRatio'] > 0) {
-          if (w/h < Module['forcedAspectRatio']) {
-            w = Math.round(h * Module['forcedAspectRatio']);
-          } else {
-            h = Math.round(w / Module['forcedAspectRatio']);
-          }
-        }
-        if ((getFullscreenElement() === canvas.parentNode) && (typeof screen != 'undefined')) {
-           var factor = Math.min(screen.width / w, screen.height / h);
-           w = Math.round(w * factor);
-           h = Math.round(h * factor);
-        }
-        if (Browser.resizeCanvas) {
-          if (canvas.width  != w) canvas.width  = w;
-          if (canvas.height != h) canvas.height = h;
-          if (typeof canvas.style != 'undefined') {
-            canvas.style.removeProperty( "width");
-            canvas.style.removeProperty("height");
-          }
-        } else {
-          if (canvas.width  != wNative) canvas.width  = wNative;
-          if (canvas.height != hNative) canvas.height = hNative;
-          if (typeof canvas.style != 'undefined') {
-            if (w != wNative || h != hNative) {
-              canvas.style.setProperty( "width", w + "px", "important");
-              canvas.style.setProperty("height", h + "px", "important");
-            } else {
-              canvas.style.removeProperty( "width");
-              canvas.style.removeProperty("height");
-            }
-          }
-        }
-      },
-  };
-  var requestFullscreen = Browser.requestFullscreen;
-
   FS.createPreloadedFile = FS_createPreloadedFile;
   FS.preloadFile = FS_preloadFile;
   FS.staticInit();;
@@ -6979,7 +6774,6 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
 // Begin runtime exports
   Module['ccall'] = ccall;
   Module['cwrap'] = cwrap;
-  Module['requestFullscreen'] = requestFullscreen;
   var missingLibrarySymbols = [
   'writeI53ToI64',
   'writeI53ToI64Clamped',
@@ -7029,7 +6823,6 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   'UTF32ToString',
   'stringToUTF32',
   'lengthBytesUTF32',
-  'registerUiEventCallback',
   'registerFocusEventCallback',
   'fillDeviceOrientationEventData',
   'registerDeviceOrientationEventCallback',
@@ -7051,7 +6844,6 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   'fillPointerlockChangeEventData',
   'registerPointerlockChangeEventCallback',
   'registerPointerlockErrorEventCallback',
-  'requestPointerLock',
   'fillVisibilityChangeEventData',
   'registerVisibilityChangeEventCallback',
   'registerTouchEventCallback',
@@ -7069,6 +6861,7 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   'checkWasiClock',
   'wasiRightsToMuslOFlags',
   'wasiOFlagsToMuslOFlags',
+  'safeSetTimeout',
   'setImmediateWrapped',
   'safeRequestAnimationFrame',
   'clearImmediateWrapped',
@@ -7217,15 +7010,16 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'fillMouseEventData',
   'registerMouseEventCallback',
   'registerWheelEventCallback',
+  'registerUiEventCallback',
   'currentFullscreenStrategy',
   'restoreOldWindowedStyle',
+  'requestPointerLock',
   'UNWIND_CACHE',
   'ExitStatus',
   'doReadv',
   'doWritev',
   'initRandomFill',
   'randomFill',
-  'safeSetTimeout',
   'emSetImmediate',
   'emClearImmediate_deps',
   'emClearImmediate',
@@ -7233,6 +7027,7 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'uncaughtExceptionCount',
   'exceptionCaught',
   'Browser',
+  'requestFullscreen',
   'requestFullScreen',
   'setCanvasSize',
   'getUserMedia',
@@ -7410,11 +7205,11 @@ function checkIncomingModuleAPI() {
 function js_set_clipboard(text) { const str = UTF8ToString(text); navigator.clipboard.writeText(str).catch(() => {}); }
 
 // Imports from the Wasm binary.
+var _malloc = makeInvalidEarlyAccess('_malloc');
 var _free = makeInvalidEarlyAccess('_free');
 var _main = Module['_main'] = makeInvalidEarlyAccess('_main');
 var _invoke_http_callback = Module['_invoke_http_callback'] = makeInvalidEarlyAccess('_invoke_http_callback');
 var _on_http_result = Module['_on_http_result'] = makeInvalidEarlyAccess('_on_http_result');
-var _malloc = makeInvalidEarlyAccess('_malloc');
 var _emwgpuCreateBindGroup = makeInvalidEarlyAccess('_emwgpuCreateBindGroup');
 var _emwgpuCreateBindGroupLayout = makeInvalidEarlyAccess('_emwgpuCreateBindGroupLayout');
 var _emwgpuCreateCommandBuffer = makeInvalidEarlyAccess('_emwgpuCreateCommandBuffer');
@@ -7459,6 +7254,7 @@ var _emscripten_stack_get_current = makeInvalidEarlyAccess('_emscripten_stack_ge
 var dynCall_v = makeInvalidEarlyAccess('dynCall_v');
 var dynCall_iiii = makeInvalidEarlyAccess('dynCall_iiii');
 var dynCall_viiiii = makeInvalidEarlyAccess('dynCall_viiiii');
+var dynCall_viiii = makeInvalidEarlyAccess('dynCall_viiii');
 var dynCall_vii = makeInvalidEarlyAccess('dynCall_vii');
 var dynCall_vi = makeInvalidEarlyAccess('dynCall_vi');
 var dynCall_ii = makeInvalidEarlyAccess('dynCall_ii');
@@ -7466,7 +7262,6 @@ var dynCall_viji = makeInvalidEarlyAccess('dynCall_viji');
 var dynCall_jiji = makeInvalidEarlyAccess('dynCall_jiji');
 var dynCall_iidiiii = makeInvalidEarlyAccess('dynCall_iidiiii');
 var dynCall_viiiiii = makeInvalidEarlyAccess('dynCall_viiiiii');
-var dynCall_viiii = makeInvalidEarlyAccess('dynCall_viiii');
 var _asyncify_start_unwind = makeInvalidEarlyAccess('_asyncify_start_unwind');
 var _asyncify_stop_unwind = makeInvalidEarlyAccess('_asyncify_stop_unwind');
 var _asyncify_start_rewind = makeInvalidEarlyAccess('_asyncify_start_rewind');
@@ -7476,11 +7271,11 @@ var __indirect_function_table = makeInvalidEarlyAccess('__indirect_function_tabl
 var wasmMemory = makeInvalidEarlyAccess('wasmMemory');
 
 function assignWasmExports(wasmExports) {
+  assert(typeof wasmExports['malloc'] != 'undefined', 'missing Wasm export: malloc');
   assert(typeof wasmExports['free'] != 'undefined', 'missing Wasm export: free');
   assert(typeof wasmExports['main'] != 'undefined', 'missing Wasm export: main');
   assert(typeof wasmExports['invoke_http_callback'] != 'undefined', 'missing Wasm export: invoke_http_callback');
   assert(typeof wasmExports['on_http_result'] != 'undefined', 'missing Wasm export: on_http_result');
-  assert(typeof wasmExports['malloc'] != 'undefined', 'missing Wasm export: malloc');
   assert(typeof wasmExports['emwgpuCreateBindGroup'] != 'undefined', 'missing Wasm export: emwgpuCreateBindGroup');
   assert(typeof wasmExports['emwgpuCreateBindGroupLayout'] != 'undefined', 'missing Wasm export: emwgpuCreateBindGroupLayout');
   assert(typeof wasmExports['emwgpuCreateCommandBuffer'] != 'undefined', 'missing Wasm export: emwgpuCreateCommandBuffer');
@@ -7525,6 +7320,7 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['dynCall_v'] != 'undefined', 'missing Wasm export: dynCall_v');
   assert(typeof wasmExports['dynCall_iiii'] != 'undefined', 'missing Wasm export: dynCall_iiii');
   assert(typeof wasmExports['dynCall_viiiii'] != 'undefined', 'missing Wasm export: dynCall_viiiii');
+  assert(typeof wasmExports['dynCall_viiii'] != 'undefined', 'missing Wasm export: dynCall_viiii');
   assert(typeof wasmExports['dynCall_vii'] != 'undefined', 'missing Wasm export: dynCall_vii');
   assert(typeof wasmExports['dynCall_vi'] != 'undefined', 'missing Wasm export: dynCall_vi');
   assert(typeof wasmExports['dynCall_ii'] != 'undefined', 'missing Wasm export: dynCall_ii');
@@ -7532,18 +7328,17 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['dynCall_jiji'] != 'undefined', 'missing Wasm export: dynCall_jiji');
   assert(typeof wasmExports['dynCall_iidiiii'] != 'undefined', 'missing Wasm export: dynCall_iidiiii');
   assert(typeof wasmExports['dynCall_viiiiii'] != 'undefined', 'missing Wasm export: dynCall_viiiiii');
-  assert(typeof wasmExports['dynCall_viiii'] != 'undefined', 'missing Wasm export: dynCall_viiii');
   assert(typeof wasmExports['asyncify_start_unwind'] != 'undefined', 'missing Wasm export: asyncify_start_unwind');
   assert(typeof wasmExports['asyncify_stop_unwind'] != 'undefined', 'missing Wasm export: asyncify_stop_unwind');
   assert(typeof wasmExports['asyncify_start_rewind'] != 'undefined', 'missing Wasm export: asyncify_start_rewind');
   assert(typeof wasmExports['asyncify_stop_rewind'] != 'undefined', 'missing Wasm export: asyncify_stop_rewind');
   assert(typeof wasmExports['memory'] != 'undefined', 'missing Wasm export: memory');
   assert(typeof wasmExports['__indirect_function_table'] != 'undefined', 'missing Wasm export: __indirect_function_table');
+  _malloc = createExportWrapper('malloc', 1);
   _free = createExportWrapper('free', 1);
   _main = Module['_main'] = createExportWrapper('main', 2);
   _invoke_http_callback = Module['_invoke_http_callback'] = createExportWrapper('invoke_http_callback', 3);
   _on_http_result = Module['_on_http_result'] = createExportWrapper('on_http_result', 2);
-  _malloc = createExportWrapper('malloc', 1);
   _emwgpuCreateBindGroup = createExportWrapper('emwgpuCreateBindGroup', 1);
   _emwgpuCreateBindGroupLayout = createExportWrapper('emwgpuCreateBindGroupLayout', 1);
   _emwgpuCreateCommandBuffer = createExportWrapper('emwgpuCreateCommandBuffer', 1);
@@ -7588,6 +7383,7 @@ function assignWasmExports(wasmExports) {
   dynCall_v = dynCalls['v'] = createExportWrapper('dynCall_v', 1);
   dynCall_iiii = dynCalls['iiii'] = createExportWrapper('dynCall_iiii', 4);
   dynCall_viiiii = dynCalls['viiiii'] = createExportWrapper('dynCall_viiiii', 6);
+  dynCall_viiii = dynCalls['viiii'] = createExportWrapper('dynCall_viiii', 5);
   dynCall_vii = dynCalls['vii'] = createExportWrapper('dynCall_vii', 3);
   dynCall_vi = dynCalls['vi'] = createExportWrapper('dynCall_vi', 2);
   dynCall_ii = dynCalls['ii'] = createExportWrapper('dynCall_ii', 2);
@@ -7595,7 +7391,6 @@ function assignWasmExports(wasmExports) {
   dynCall_jiji = dynCalls['jiji'] = createExportWrapper('dynCall_jiji', 4);
   dynCall_iidiiii = dynCalls['iidiiii'] = createExportWrapper('dynCall_iidiiii', 7);
   dynCall_viiiiii = dynCalls['viiiiii'] = createExportWrapper('dynCall_viiiiii', 7);
-  dynCall_viiii = dynCalls['viiii'] = createExportWrapper('dynCall_viiii', 5);
   _asyncify_start_unwind = createExportWrapper('asyncify_start_unwind', 1);
   _asyncify_stop_unwind = createExportWrapper('asyncify_stop_unwind', 0);
   _asyncify_start_rewind = createExportWrapper('asyncify_start_rewind', 1);
@@ -7616,13 +7411,25 @@ var wasmImports = {
   /** @export */
   _abort_js: __abort_js,
   /** @export */
+  emscripten_exit_pointerlock: _emscripten_exit_pointerlock,
+  /** @export */
+  emscripten_get_device_pixel_ratio: _emscripten_get_device_pixel_ratio,
+  /** @export */
+  emscripten_get_element_css_size: _emscripten_get_element_css_size,
+  /** @export */
   emscripten_get_now: _emscripten_get_now,
   /** @export */
   emscripten_has_asyncify: _emscripten_has_asyncify,
   /** @export */
+  emscripten_request_pointerlock: _emscripten_request_pointerlock,
+  /** @export */
   emscripten_resize_heap: _emscripten_resize_heap,
   /** @export */
+  emscripten_set_canvas_element_size: _emscripten_set_canvas_element_size,
+  /** @export */
   emscripten_set_keydown_callback_on_thread: _emscripten_set_keydown_callback_on_thread,
+  /** @export */
+  emscripten_set_keypress_callback_on_thread: _emscripten_set_keypress_callback_on_thread,
   /** @export */
   emscripten_set_keyup_callback_on_thread: _emscripten_set_keyup_callback_on_thread,
   /** @export */
@@ -7633,6 +7440,8 @@ var wasmImports = {
   emscripten_set_mousemove_callback_on_thread: _emscripten_set_mousemove_callback_on_thread,
   /** @export */
   emscripten_set_mouseup_callback_on_thread: _emscripten_set_mouseup_callback_on_thread,
+  /** @export */
+  emscripten_set_resize_callback_on_thread: _emscripten_set_resize_callback_on_thread,
   /** @export */
   emscripten_set_wheel_callback_on_thread: _emscripten_set_wheel_callback_on_thread,
   /** @export */
@@ -7648,7 +7457,11 @@ var wasmImports = {
   /** @export */
   emwgpuDeviceDestroy: _emwgpuDeviceDestroy,
   /** @export */
+  emwgpuGetPreferredFormat: _emwgpuGetPreferredFormat,
+  /** @export */
   emwgpuInstanceRequestAdapter: _emwgpuInstanceRequestAdapter,
+  /** @export */
+  emwgpuShaderModuleGetCompilationInfo: _emwgpuShaderModuleGetCompilationInfo,
   /** @export */
   fd_close: _fd_close,
   /** @export */
@@ -7680,11 +7493,17 @@ var wasmImports = {
   /** @export */
   wgpuDeviceCreateRenderPipeline: _wgpuDeviceCreateRenderPipeline,
   /** @export */
+  wgpuDeviceCreateSampler: _wgpuDeviceCreateSampler,
+  /** @export */
+  wgpuDeviceCreateTexture: _wgpuDeviceCreateTexture,
+  /** @export */
   wgpuInstanceCreateSurface: _wgpuInstanceCreateSurface,
   /** @export */
   wgpuQueueSubmit: _wgpuQueueSubmit,
   /** @export */
   wgpuQueueWriteBuffer: _wgpuQueueWriteBuffer,
+  /** @export */
+  wgpuQueueWriteTexture: _wgpuQueueWriteTexture,
   /** @export */
   wgpuRenderPassEncoderDraw: _wgpuRenderPassEncoderDraw,
   /** @export */
@@ -7696,13 +7515,13 @@ var wasmImports = {
   /** @export */
   wgpuRenderPassEncoderSetVertexBuffer: _wgpuRenderPassEncoderSetVertexBuffer,
   /** @export */
+  wgpuRenderPipelineGetBindGroupLayout: _wgpuRenderPipelineGetBindGroupLayout,
+  /** @export */
   wgpuSurfaceConfigure: _wgpuSurfaceConfigure,
   /** @export */
   wgpuSurfaceGetCurrentTexture: _wgpuSurfaceGetCurrentTexture,
   /** @export */
-  wgpuTextureCreateView: _wgpuTextureCreateView,
-  /** @export */
-  wgpuTextureGetFormat: _wgpuTextureGetFormat
+  wgpuTextureCreateView: _wgpuTextureCreateView
 };
 
 

@@ -1,16 +1,8 @@
 #include "pch.h"
 #ifndef __EMSCRIPTEN__
-    #include "rendering/device.h"
     #include "rendering/renderer_vulkan_draw.h"
-    #include "scene/camera.h"
-    #include "scene/lights.h"
-    #include "scene/model.h"
-    #include "scene/sky.h"
-    #include "ui/ui.h"
-    #include "ui/ui_draw.h"
-    #include "ui/ui_renderer.h"
 
-    float g_fps = 0.0f;
+    extern float g_fps;
     VkSemaphore imageAvailable[MAX_FRAMES_IN_FLIGHT];
     VkSemaphore renderFinished[MAX_FRAMES_IN_FLIGHT];
     VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
@@ -41,17 +33,17 @@
                                    : (0.9f * g_fps + 0.1f * inst_fps);
         }
 
-        // Wait for the current frame to be free
         vkWaitForFences(vk_device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
         vkResetFences(vk_device, 1, &inFlightFences[currentFrame]);
 
-        // Acquire next image from swapchain
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(vk_device, swapchain, UINT64_MAX,
                                                 imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-            return; // recreate swapchain here if needed
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            recreate_swapchain();
+            return;
+        }
 
         // Reset and record command buffer for this frame
         vkResetCommandBuffer(commandBuffers[currentFrame], 0);
@@ -115,7 +107,6 @@
 
         vkQueueSubmit(graphicsQueue, 1, &submit, inFlightFences[currentFrame]);
 
-        // Present frame
         VkPresentInfoKHR present = {0};
         present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present.waitSemaphoreCount = 1;
@@ -124,7 +115,19 @@
         present.pSwapchains = &swapchain;
         present.pImageIndices = &imageIndex;
 
-        vkQueuePresentKHR(graphicsQueue, &present);
+        result = vkQueuePresentKHR(graphicsQueue, &present);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || 
+            result == VK_SUBOPTIMAL_KHR || 
+            framebufferResized) 
+        {
+            framebufferResized = 0;
+            recreate_swapchain();
+        }
+        else if (result != VK_SUCCESS)
+        {
+            printf("FATAL ERROR IN VULKAN IMAGE PRESENT");
+        }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }

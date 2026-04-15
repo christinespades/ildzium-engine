@@ -1,11 +1,11 @@
 #include "pch.h"
-#ifndef __EMSCRIPTEN__
-    #include "scene/model.h"
-    #define CGLTF_IMPLEMENTATION
-    #define CGLTF_MESHOPT_DECODE 1
-    #define MESHOPTIMIZER_IMPLEMENTATION
-    #include "cgltf.h"
+#include "scene/model.h"
+#define CGLTF_IMPLEMENTATION
+#define CGLTF_MESHOPT_DECODE 1
+#define MESHOPTIMIZER_IMPLEMENTATION
+#include "cgltf.h"
 
+#ifndef __EMSCRIPTEN__
     extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     extern VkDevice vk_device;
     extern VkPipeline modelPipeline;
@@ -143,26 +143,6 @@
         printf("Model pipeline created successfully\n");
     }
 
-    // Create / resize the instance storage buffer
-    static void create_instance_buffer(uint32_t capacity)
-    {
-        VkDeviceSize newSize = (VkDeviceSize)capacity * sizeof(InstanceData);
-
-        // Destroy old buffer if it exists
-        if (g_model_system.instanceBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(vk_device, g_model_system.instanceBuffer, NULL);
-            vkFreeMemory(vk_device, g_model_system.instanceMemory, NULL);
-        }
-
-        create_vulkan_buffer(newSize,
-                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                             &g_model_system.instanceBuffer,
-                             &g_model_system.instanceMemory);
-
-        g_model_system.instanceBufferSize = newSize;
-        g_model_system.instanceCapacity = capacity;
-    }
-
     void create_model_descriptors(void)
     {
         VkDescriptorSetLayoutBinding bindings[2] = {0};
@@ -265,12 +245,17 @@
         }
         vkUpdateDescriptorSets(vk_device, 1, &write, 0, NULL);
     }
+#endif
 
     void init_model_system(void)
     {
+    #ifdef __EMSCRIPTEN__
+        create_model_bind_group_layout();
+        create_model_pipeline_webgpu();
+    #else
         create_model_descriptors();
         create_model_pipeline();
-
+    #endif
         g_model_system.models = NULL;
         g_model_system.modelCount = 0;
         g_model_system.modelCapacity = 0;
@@ -279,7 +264,14 @@
         g_model_system.instanceCount = 0;
         g_model_system.instanceCapacity = 256;           // reasonable starting size
         g_model_system.instances = malloc(g_model_system.instanceCapacity * sizeof(InstanceData));
-
+    #ifdef __EMSCRIPTEN__
+        WGPUBufferDescriptor bufDesc = {
+            .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+            .size = g_model_system.instanceCapacity * sizeof(InstanceData),
+            .mappedAtCreation = false
+        };
+        g_model_system.instanceBuffer = wgpuDeviceCreateBuffer(device, &bufDesc);
+    #else
         g_model_system.instanceBuffer = VK_NULL_HANDLE;
         g_model_system.instanceMemory = VK_NULL_HANDLE;
         g_model_system.instanceBufferSize = 0;
@@ -303,7 +295,148 @@
 
         update_model_instances();
         update_model_descriptor();
+    #endif
     }
+
+#ifdef __EMSCRIPTEN__
+    WGPURenderPipeline modelPipeline = NULL;
+    WGPUPipelineLayout modelPipelineLayout = NULL;
+    WGPUBindGroup modelBindGroup = NULL;        // set 0: camera + lights + instances
+    WGPUBindGroupLayout    modelBindGroupLayout = NULL;   // ← NEW: we need this
+
+    void create_model_pipeline_webgpu(void)
+    {
+        WGPUShaderModule modelVertexShader   = create_shader_module(device, model_vertex_wgsl,   "model_vertex");
+        WGPUShaderModule modelFragmentShader = create_shader_module(device, model_fragment_wgsl, "model_fragment");
+
+        // Vertex layout (position, normal, uv)
+        WGPUVertexAttribute attrs[3] = {
+            { .format = WGPUVertexFormat_Float32x3, .offset = offsetof(Vertex3D, x), .shaderLocation = 0 },
+            { .format = WGPUVertexFormat_Float32x3, .offset = offsetof(Vertex3D, nx), .shaderLocation = 1 },
+            { .format = WGPUVertexFormat_Float32x2, .offset = offsetof(Vertex3D, u), .shaderLocation = 2 }
+        };
+
+        WGPUVertexBufferLayout vertexBufferLayout = {
+            .arrayStride = sizeof(Vertex3D),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = 3,
+            .attributes = attrs
+        };
+
+        // Instance layout (mat4 + color) - 5 vec4s
+        WGPUVertexAttribute instAttrs[5] = {
+            { .format = WGPUVertexFormat_Float32x4, .offset = 0,  .shaderLocation = 3 },
+            { .format = WGPUVertexFormat_Float32x4, .offset = 16, .shaderLocation = 4 },
+            { .format = WGPUVertexFormat_Float32x4, .offset = 32, .shaderLocation = 5 },
+            { .format = WGPUVertexFormat_Float32x4, .offset = 48, .shaderLocation = 6 },
+            { .format = WGPUVertexFormat_Float32x4, .offset = 64, .shaderLocation = 7 } // color
+        };
+
+        WGPUVertexBufferLayout instanceBufferLayout = {
+            .arrayStride = sizeof(InstanceData),
+            .stepMode = WGPUVertexStepMode_Instance,
+            .attributeCount = 5,
+            .attributes = instAttrs
+        };
+
+        WGPUVertexState vertexState = {
+            .module = modelVertexShader,
+            .entryPoint = (WGPUStringView){.data = "main", .length = 4},
+            .bufferCount = 2,
+            .buffers = (WGPUVertexBufferLayout[]){ vertexBufferLayout, instanceBufferLayout }
+        };
+
+        WGPUFragmentState fragmentState = {
+            .module = modelFragmentShader,
+            .entryPoint = (WGPUStringView){.data = "main", .length = 4},
+            .targetCount = 1,
+            .targets = &(WGPUColorTargetState){
+                .format = WGPUTextureFormat_BGRA8Unorm,   // change if your surface uses different format
+                .blend = NULL,
+                .writeMask = WGPUColorWriteMask_All
+            }
+        };
+
+        // Depth state
+        WGPUDepthStencilState depthStencil = {
+            .format = WGPUTextureFormat_Depth24PlusStencil8,   // or Depth32Float
+            .depthWriteEnabled = true,
+            .depthCompare = WGPUCompareFunction_LessEqual,
+            .stencilFront = { .compare = WGPUCompareFunction_Always },
+            .stencilBack  = { .compare = WGPUCompareFunction_Always },
+            .stencilReadMask = 0xFFFFFFFF,
+            .stencilWriteMask = 0xFFFFFFFF
+        };
+
+        WGPURenderPipelineDescriptor pipelineDesc = {
+            .label = (WGPUStringView){.data = "ModelPipeline", .length = 13},
+            .layout = modelPipelineLayout,
+            .vertex = vertexState,
+            .primitive = {
+                .topology = WGPUPrimitiveTopology_TriangleList,
+                .cullMode = WGPUCullMode_Back,
+                .frontFace = WGPUFrontFace_CCW
+            },
+            .depthStencil = &depthStencil,
+            .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+            .fragment = &fragmentState
+        };
+
+        modelPipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+        wgpuShaderModuleRelease(modelVertexShader);
+        wgpuShaderModuleRelease(modelFragmentShader);
+    }
+
+    // Create bind group layout + bind group for models (camera + lights + instances)
+    static void create_model_bind_group_layout(void)
+    {
+        WGPUBindGroupLayoutEntry entries[3] = {
+            // Binding 0: Camera UBO
+            {
+                .binding = 0,
+                .visibility = WGPUShaderStage_VERTEX,
+                .buffer = {
+                    .type = WGPUBufferBindingType_Uniform,
+                    .minBindingSize = sizeof(CameraUBO)
+                }
+            },
+            // Binding 1: Lighting UBO
+            {
+                .binding = 1,
+                .visibility = WGPUShaderStage_VERTEX | WGPUShaderStage_FRAGMENT,
+                .buffer = {
+                    .type = WGPUBufferBindingType_Uniform,
+                    .minBindingSize = sizeof(LightingUBO)
+                }
+            },
+            // Binding 2: Instance SSBO (storage buffer)
+            {
+                .binding = 2,
+                .visibility = WGPUShaderStage_VERTEX,
+                .buffer = {
+                    .type = WGPUBufferBindingType_ReadOnlyStorage,
+                    .minBindingSize = 0   // dynamic size is ok for storage buffers
+                }
+            }
+        };
+
+        WGPUBindGroupLayoutDescriptor layoutDesc = {
+            .label = (WGPUStringView){.data = "ModelBindGroupLayout", .length = 21},
+            .entryCount = 3,
+            .entries = entries
+        };
+
+        modelBindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &layoutDesc);
+
+        WGPUPipelineLayoutDescriptor pipeLayoutDesc = {
+            .label = (WGPUStringView){.data = "ModelPipelineLayout", .length = 19},
+            .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &modelBindGroupLayout
+        };
+
+        modelPipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipeLayoutDesc);
+    }
+#endif
 
     Model* find_or_load_model(const char* glb_path)
     {
@@ -381,8 +514,40 @@
             vertices[i].v = uvs ? uvs[i*2 + 1] : 0.0f;
         }
 
-        // Create Vulkan buffers for the mesh
+        // Create buffers for the mesh
         Mesh mesh = {0};
+    #ifdef __EMSCRIPTEN__
+        mesh.vertexCount = vertexCount;
+        mesh.indexCount = index_count;
+
+        // Store CPU copy for WebGPU (we upload once)
+        mesh.vertexData = malloc(vertexCount * sizeof(Vertex3D));
+        memcpy(mesh.vertexData, vertices, vertexCount * sizeof(Vertex3D));
+
+        if (index_count > 0) {
+            mesh.indexData = malloc(index_count * sizeof(uint32_t));
+            memcpy(mesh.indexData, indices, index_count * sizeof(uint32_t));
+        }
+
+        // Create GPU buffers
+        {
+            WGPUBufferDescriptor vdesc = {
+                .usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
+                .size = vertexCount * sizeof(Vertex3D)
+            };
+            mesh.vertexBuffer = wgpuDeviceCreateBuffer(device, &vdesc);
+            wgpuQueueWriteBuffer(queue, mesh.vertexBuffer, 0, mesh.vertexData, vdesc.size);
+        }
+
+        if (index_count > 0) {
+            WGPUBufferDescriptor idesc = {
+                .usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst,
+                .size = index_count * sizeof(uint32_t)
+            };
+            mesh.indexBuffer = wgpuDeviceCreateBuffer(device, &idesc);
+            wgpuQueueWriteBuffer(queue, mesh.indexBuffer, 0, mesh.indexData, idesc.size);
+        }
+    #else
         VkDeviceSize vsize = vertexCount * sizeof(Vertex3D);
 
         create_vulkan_buffer(vsize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -404,7 +569,7 @@
             mesh.indexCount = (uint32_t)index_count;
         }
         mesh.vertexCount = vertexCount;
-
+    #endif
         // === Grow the models array if needed ===
         if (g_model_system.modelCount >= g_model_system.modelCapacity) {
             g_model_system.modelCapacity = g_model_system.modelCapacity ? g_model_system.modelCapacity * 2 : 8;
@@ -433,123 +598,39 @@
         return model;
     }
 
-    void add_model_instance(const char* model_name, const float transform[16], const float color[4])
-    {
-        // Load (or find) the model ONLY ONCE
-        static Model* cached_model = NULL;
-        static const char* last_name = NULL;
-
-        if (cached_model == NULL || strcmp(model_name, last_name) != 0) {
-            cached_model = find_or_load_model(model_name);
-            last_name = model_name;               // safe because path is constant string
-        }
-
-        if (!cached_model) return;
-
-        // Grow instance array if needed
-        if (g_model_system.instanceCount >= g_model_system.instanceCapacity) {
-            g_model_system.instanceCapacity *= 2;
-            if (g_model_system.instanceCapacity == 0) g_model_system.instanceCapacity = 256;
-            g_model_system.instances = realloc(g_model_system.instances,
-                                               g_model_system.instanceCapacity * sizeof(InstanceData));
-        }
-
-        uint32_t idx = g_model_system.instanceCount++;
-        InstanceData* inst = &g_model_system.instances[idx];
-
-        memcpy(inst->model, transform, 16 * sizeof(float));
-        memcpy(inst->color, color, 4 * sizeof(float));
-
-        cached_model->instanceCount++;   // bookkeeping
-    }
-
-    void update_model_instances(void)
-    {
-        if (g_model_system.instanceCount == 0) return;
-
-        VkDeviceSize needed = (VkDeviceSize)g_model_system.instanceCount * sizeof(InstanceData);
-        if (needed > g_model_system.instanceBufferSize) {
-            create_instance_buffer(g_model_system.instanceCount * 2);
-            update_model_descriptor();
-        }
-
-        void* data;
-        vkMapMemory(vk_device, g_model_system.instanceMemory, 0, needed, 0, &data);
-        
-        // Transpose each model matrix while copying (optimal place)
-        InstanceData* gpuData = (InstanceData*)data;
-        for (uint32_t i = 0; i < g_model_system.instanceCount; ++i) {
-            const InstanceData* cpuInst = &g_model_system.instances[i];
-
-            // Transpose model matrix (row-major → column-major for GLSL)
-            for (int col = 0; col < 4; ++col) {
-                for (int row = 0; row < 4; ++row) {
-                    gpuData[i].model[col * 4 + row] = cpuInst->model[row * 4 + col];
-                }
-            }
-
-            // Copy color as-is
-            gpuData[i].color[0] = cpuInst->color[0];
-            gpuData[i].color[1] = cpuInst->color[1];
-            gpuData[i].color[2] = cpuInst->color[2];
-            gpuData[i].color[3] = cpuInst->color[3];
-        }
-        vkUnmapMemory(vk_device, g_model_system.instanceMemory);
-    }
-
-    void draw_models(VkCommandBuffer cmd)
-    {
-        if (g_model_system.modelCount == 0 || g_model_system.instanceCount == 0) return;
-
-        update_model_instances();
-
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline);
-
-        VkDescriptorSet sets[2] = { g_lights.descriptorSet, modelDescriptorSet };
-
-        // --- Bind descriptor (set 0, binding 0) ---
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                modelPipelineLayout,
-                                0, 2, sets, 0, NULL);
-
-        // For now we only support ONE model (the first one). We'll improve this soon.
-        Model* m = &g_model_system.models[0];
-        if (m->mesh.vertexBuffer == VK_NULL_HANDLE) return;
-
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &m->mesh.vertexBuffer, &offset);
-
-        if (m->mesh.indexCount > 0) {
-            vkCmdBindIndexBuffer(cmd, m->mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdDrawIndexed(cmd, m->mesh.indexCount, g_model_system.instanceCount, 0, 0, 0);
-        } else {
-            vkCmdDraw(cmd, m->mesh.vertexCount, g_model_system.instanceCount, 0, 0);
-        }
-    }
-
     void cleanup_model_system(void)
     {
-        // Destroy all loaded models' meshes
         for (uint32_t i = 0; i < g_model_system.modelCount; ++i) {
             Mesh* m = &g_model_system.models[i].mesh;
-            vkDestroyBuffer(vk_device, m->vertexBuffer, NULL);
-            vkFreeMemory(vk_device, m->vertexMemory, NULL);
-            if (m->indexCount > 0) {
-                vkDestroyBuffer(vk_device, m->indexBuffer, NULL);
-                vkFreeMemory(vk_device, m->indexMemory, NULL);
-            }
             free(g_model_system.models[i].name);
+
+            #ifdef __EMSCRIPTEN__
+                if (m->vertexBuffer) wgpuBufferRelease(m->vertexBuffer);
+                if (m->indexBuffer)  wgpuBufferRelease(m->indexBuffer);
+                free(m->vertexData);
+                free(m->indexData);
+            #else
+                vkDestroyBuffer(vk_device, m->vertexBuffer, NULL);
+                vkFreeMemory(vk_device, m->vertexMemory, NULL);
+                if (m->indexCount > 0) {
+                    vkDestroyBuffer(vk_device, m->indexBuffer, NULL);
+                    vkFreeMemory(vk_device, m->indexMemory, NULL);
+                }
+            #endif
         }
 
         free(g_model_system.models);
         free(g_model_system.instances);
 
+    #ifdef __EMSCRIPTEN__
+        if (g_model_system.instanceBuffer) wgpuBufferRelease(g_model_system.instanceBuffer);
+    #else
         if (g_model_system.instanceBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(vk_device, g_model_system.instanceBuffer, NULL);
             vkFreeMemory(vk_device, g_model_system.instanceMemory, NULL);
         }
+    #endif
 
         // Reset everything
         g_model_system = (ModelSystem){0};
     }
-#endif

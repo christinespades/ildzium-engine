@@ -2,15 +2,30 @@
 #include "input_mouse.h"
 
 int mouse_wheel = 0;
-#ifndef __EMSCRIPTEN__
-    float lastX = 640.0f;
-    float lastY = 360.0f;
-    int firstMouse = 1;    // Use int instead of bool
-#else
-    static int g_mouse_buttons[3] = {0};
-    static double g_mouse_x = 0;
-    static double g_mouse_y = 0;
+float lastX = 640.0f;
+float lastY = 360.0f;
+int firstMouse = 1; 
+const float MOUSE_SENSITIVITY = 0.08f;
+
+#ifdef __EMSCRIPTEN__
+    int g_mouse_buttons[3] = {0};
+    double g_mouse_x = 0;
+    double g_mouse_y = 0;
 #endif
+
+void handle_mouse_movement(float xoffset, float yoffset) {
+    if (g_ui_ctx->cursor_captured)
+        return;
+
+    xoffset *= MOUSE_SENSITIVITY;
+    yoffset *= MOUSE_SENSITIVITY;
+
+    camera.yaw   += xoffset;
+    camera.pitch -= yoffset; // Keeping your specific pitch logic
+
+    if (camera.pitch > 89.0f)  camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f) camera.pitch = -89.0f;
+}
 
 int platform_get_mouse_button(int button)
 {
@@ -34,9 +49,14 @@ void platform_get_mouse_pos(double* x, double* y)
 #ifdef __EMSCRIPTEN__
     EM_BOOL mouse_move(int eventType, const EmscriptenMouseEvent* e, void* userData)
     {
-        g_mouse_x = e->canvasX;
-        g_mouse_y = e->canvasY;
-        return 0;
+        // Update absolute pos for UI/Picking
+        g_mouse_x = (double)e->canvasX;
+        g_mouse_y = (double)e->canvasY;
+
+        // movementX/Y are the deltas provided by the browser during Pointer Lock
+        handle_mouse_movement((float)e->movementX, (float)e->movementY);
+        
+        return EM_TRUE;
     }
 
     EM_BOOL mouse_down(int eventType, const EmscriptenMouseEvent* e, void* userData)
@@ -71,18 +91,7 @@ void platform_get_mouse_pos(double* x, double* y)
         lastX = (float)xpos;
         lastY = (float)ypos;
 
-        float sensitivity = 0.08f;
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
-
-        if (g_ui_ctx->cursor_captured)
-            return;
-
-        camera.yaw   += xoffset;
-        camera.pitch -= yoffset;
-
-        if (camera.pitch > 89.0f)  camera.pitch = 89.0f;
-        if (camera.pitch < -89.0f) camera.pitch = -89.0f;
+        handle_mouse_movement(xoffset, yoffset);
     }
 
     void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)

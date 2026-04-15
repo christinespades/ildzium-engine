@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "input/input_keys_get.h"
 
+unsigned char g_keys[512] = {0};
+
 int platform_get_key_down(platform_key key)
 {
 #ifdef __EMSCRIPTEN__

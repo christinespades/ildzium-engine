@@ -1,10 +1,12 @@
+#pragma once
+#include "core/math.h"
+#include "rendering/shaders.h"
+#include "scene/lights.h"
+#include "scene/model_instances.h"
+#include "scene/model_wgsl.h"
 #ifndef __EMSCRIPTEN__
-    #pragma once
-    #include "core/math.h"
-    #include "rendering/renderer_vulkan.h" 
-    #include "rendering/shaders.h"
-    #include "scene/lights.h"
-
+    #include "rendering/renderer_vulkan.h"
+#endif
     typedef struct {
         float x, y, z;
         float nx, ny, nz;
@@ -12,10 +14,15 @@
     } Vertex3D;
 
     typedef struct {
+    #ifdef __EMSCRIPTEN__
+        WGPUBuffer vertexBuffer;
+        WGPUBuffer indexBuffer;
+    #else
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexMemory;
         VkBuffer indexBuffer;
         VkDeviceMemory indexMemory;
+    #endif
         uint32_t vertexCount;
         uint32_t indexCount;
     } Mesh;
@@ -41,27 +48,29 @@
         InstanceData* instances;       // still one big buffer for the GPU
         uint32_t instanceCapacity;
         uint32_t instanceCount;        // total live instances across ALL models
-
+    #ifdef __EMSCRIPTEN__
+        WGPUBuffer instanceBuffer;
+    #else
         VkBuffer instanceBuffer;
         VkDeviceMemory instanceMemory;
         VkDeviceSize instanceBufferSize;
+    #endif
     } ModelSystem;
 
     ModelSystem g_model_system;
+
+#ifndef __EMSCRIPTEN__
+    VkPipeline modelPipeline;
     VkPipelineLayout modelPipelineLayout;
     VkDescriptorSet modelDescriptorSet;
     VkDescriptorSetLayout modelDescriptorSetLayout;
     VkDescriptorPool modelDescriptorPool;
 
-    void init_model_system(void);
-    void load_model(const char* glb_path);
-    Model* find_or_load_model(const char* name);     // returns Model*
-    void add_model_instance(const char* model_name, const float transform[16], const float color[4]);
-    void draw_models(VkCommandBuffer cmd);          // one draw call for ALL instances
-    void update_model_instances(void);              // upload to GPU (call inside draw_models)
-    void destroy_model(Model* model);
-    void cleanup_model_system(void);
-
     void create_model_descriptors(void);
     void update_model_descriptor(void);
 #endif
+    void init_model_system(void);
+    void load_model(const char* glb_path);
+    Model* find_or_load_model(const char* name);     // returns Model*
+    void destroy_model(Model* model);
+    void cleanup_model_system(void);

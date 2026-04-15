@@ -1,10 +1,7 @@
 #pragma once
-
-typedef enum {
-    GPU_STATE_NOT_READY = 0,
-    GPU_STATE_ADAPTER_OK,
-    GPU_STATE_DEVICE_OK,
-    GPU_STATE_READY
-} GPUState;
-
-extern GPUState gpu_state;
+#include "rendering/device.h"
+#include "ui/ui_renderer.h"
+#include "scene/model.h"
+#include "rendering/shaders.h"
+#include "scene/camera.h"
+#include "scene/sky_webgpu.h"

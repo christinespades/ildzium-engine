@@ -1,7 +1,8 @@
 #pragma once
 #include "core/events.h"
-#include "core/platform.h"
 #include "core/settings.h"
+#include "core/time.h"
+#include "core/window.h"
 #include "ui/ui_context.h"
 #include "input/input.h"
 #include "scene/sky.h"

@@ -32,33 +32,34 @@ typedef struct {
 
 extern SkyParameters g_skyParams;
 
-#ifndef __EMSCRIPTEN__
-    typedef struct {
-        float time;
-        float yaw;
-        float pitch;
-        float timeOfDay;
-        float dayNightBlend;
-        float nebulaSpeed;
-        float nebulaScale;
-        float nebulaIntensity;
-        float nebulaLayerCount;
-        float starCount;
-        float starBrightness;
-        float starTwinkleSpeed;
-        float starSize;
-        float auroraIntensity;
-        float auroraSpeed;
-        float pad0;               // 16-byte alignment padding for the next vec4
-        float nebulaColorNight[4]; // Must be 4 floats
-        float nebulaColorDay[4];   // Must be 4 floats
-        float auroraColor[4];      // Must be 4 floats
-        float vignetteStrength;
-        float overallBrightness;
-        float pad1, pad2;          // Pad the end to 16-byte multiple
-        float inverseView[16];
-    } SkyUBO;
+typedef struct {
+    float time;
+    float yaw;
+    float pitch;
+    float timeOfDay;
+    float dayNightBlend;
+    float nebulaSpeed;
+    float nebulaScale;
+    float nebulaIntensity;
+    float nebulaLayerCount;
+    float starCount;
+    float starBrightness;
+    float starTwinkleSpeed;
+    float starSize;
+    float auroraIntensity;
+    float auroraSpeed;
+    float pad0;               // 16-byte alignment padding for the next vec4
+    float nebulaColorNight[4]; // Must be 4 floats
+    float nebulaColorDay[4];   // Must be 4 floats
+    float auroraColor[4];      // Must be 4 floats
+    float vignetteStrength;
+    float overallBrightness;
+    float pad1, pad2;          // Pad the end to 16-byte multiple
+    float inverseView[16];
+} SkyUBO;
+    extern SkyUBO skyUBOData;
 
+#ifndef __EMSCRIPTEN__
     extern VkPipeline skyPipeline;
     extern VkPipelineLayout skyPipelineLayout;
     extern VkShaderModule vertShaderModule;
@@ -67,5 +68,5 @@ extern SkyParameters g_skyParams;
     void sky_init(void);
     void sky_cleanup(void);
     void sky_draw(VkCommandBuffer cmd);
-    void sky_update(void);
 #endif
+    void sky_update(void);

@@ -1,14 +1,15 @@
 #include "pch.h"
-#ifndef __EMSCRIPTEN__
-    #include "ui/ui_renderer.h"
+#include "ui/ui_renderer.h"
 
+uint32_t* ui_framebuffer = NULL;
+
+#ifndef __EMSCRIPTEN__
     extern VkDevice vk_device;
     extern VkPhysicalDevice physicalDevice;
     extern VkExtent2D swapchainExtent;
     extern VkCommandPool commandPool;
     extern VkQueue graphicsQueue;
     extern VkRenderPass renderPass;
-
     extern uint32_t findMemoryType(uint32_t, VkMemoryPropertyFlags);
     extern uint32_t* load_spirv(const char*, size_t*);
 
@@ -16,15 +17,58 @@
     VkDeviceMemory uiImageMemory = VK_NULL_HANDLE;
     VkImageView uiImageView = VK_NULL_HANDLE;
     VkSampler uiSampler = VK_NULL_HANDLE;
-    VkDescriptorSet uiDescriptorSet = VK_NULL_HANDLE; // for UI shader
+    VkDescriptorSet uiDescriptorSet = VK_NULL_HANDLE;
     VkDescriptorSetLayout uiDescriptorSetLayout;
     VkDescriptorPool uiDescriptorPool;
     VkPipeline uiPipeline = VK_NULL_HANDLE;
     VkPipelineLayout uiPipelineLayout = VK_NULL_HANDLE;
     VkBuffer uiVertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory uiVertexBufferMemory = VK_NULL_HANDLE;
-    uint32_t* ui_framebuffer = NULL;
+#else
+    #include "rendering/renderer_webgpu.h"
+    extern WGPUDevice device;
+    extern WGPUQueue queue;
+    extern WGPUTextureFormat swapchainFormat;
 
+    WGPURenderPipeline uiPipeline      = NULL;
+    WGPUBindGroup      uiBindGroup     = NULL;
+    WGPUBuffer         uiVertexBuffer  = NULL;
+    WGPUTexture        uiTexture       = NULL;
+    WGPUTextureView    uiTextureView   = NULL;
+    WGPUSampler        uiSampler       = NULL;
+
+    static uint32_t currentUiWidth = 1280;
+    static uint32_t currentUiHeight = 720;
+
+    // when size changes
+    static void create_ui_texture(uint32_t width, uint32_t height)
+{
+    if (uiTexture) wgpuTextureRelease(uiTexture);
+    if (uiTextureView) wgpuTextureViewRelease(uiTextureView);
+
+    WGPUTextureDescriptor texDesc = {0};
+    texDesc.usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding;
+    texDesc.dimension = WGPUTextureDimension_2D;
+    texDesc.size = (WGPUExtent3D){width, height, 1};
+    texDesc.format = WGPUTextureFormat_RGBA8Unorm;
+    texDesc.mipLevelCount = 1;
+    texDesc.sampleCount = 1;
+
+    uiTexture = wgpuDeviceCreateTexture(device, &texDesc);
+
+    WGPUTextureViewDescriptor viewDesc = {0};
+    viewDesc.format = WGPUTextureFormat_RGBA8Unorm;
+    viewDesc.dimension = WGPUTextureViewDimension_2D;
+    viewDesc.mipLevelCount = 1;
+    viewDesc.arrayLayerCount = 1;
+    viewDesc.aspect = WGPUTextureAspect_All;
+
+    uiTextureView = wgpuTextureCreateView(uiTexture, &viewDesc);
+
+    currentUiWidth = width;
+    currentUiHeight = height;
+}
+#endif
     typedef struct { float x, y, u, v; } Vertex;
     Vertex quadVerts[4] = {
         {-1.f, -1.f, 0.f, 1.f},   // bottom-left in NDC
@@ -33,6 +77,7 @@
         { 1.f,  1.f, 1.f, 0.f}
     };
 
+#ifndef __EMSCRIPTEN__
     void create_ui_image() {
         VkImageCreateInfo imageInfo = {0};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -110,7 +155,6 @@
 
         vkCreatePipelineLayout(vk_device, &layoutCreate, NULL, &uiPipelineLayout);
 
-        // Descriptor pool
         VkDescriptorPoolSize poolSize = {0};
         poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSize.descriptorCount = 1;
@@ -182,10 +226,52 @@
         vkUnmapMemory(vk_device, uiVertexBufferMemory);
     }
 
-    void ui_renderer_upload(uint32_t* ui_pixels, uint32_t width, uint32_t height) {
-        // 1. Create staging buffer
-        VkDeviceSize bufferSize = (VkDeviceSize)width * height * sizeof(uint32_t);
+    void ui_renderer_resize()
+    {
+        // Make sure GPU is not using old resources
+        vkDeviceWaitIdle(vk_device);
 
+        // --- Destroy old image resources ---
+        if (uiImageView) {
+            vkDestroyImageView(vk_device, uiImageView, NULL);
+            uiImageView = VK_NULL_HANDLE;
+        }
+
+        if (uiImage) {
+            vkDestroyImage(vk_device, uiImage, NULL);
+            uiImage = VK_NULL_HANDLE;
+        }
+
+        if (uiImageMemory) {
+            vkFreeMemory(vk_device, uiImageMemory, NULL);
+            uiImageMemory = VK_NULL_HANDLE;
+        }
+
+        // --- Recreate with new swapchain extent ---
+        create_ui_image();
+
+        // --- Update descriptor set (IMPORTANT) ---
+        VkDescriptorImageInfo imgInfo = {0};
+        imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imgInfo.imageView = uiImageView;
+        imgInfo.sampler = uiSampler;
+
+        VkWriteDescriptorSet write = {0};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = uiDescriptorSet;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo = &imgInfo;
+
+        vkUpdateDescriptorSets(vk_device, 1, &write, 0, NULL);
+    }
+
+#endif
+
+    void ui_renderer_upload(uint32_t* ui_pixels, uint32_t width, uint32_t height) {
+    #ifndef __EMSCRIPTEN__
+        VkDeviceSize bufferSize = (VkDeviceSize)width * height * sizeof(uint32_t);
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingMemory;
 
@@ -228,17 +314,10 @@
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
         vkBeginCommandBuffer(cmd, &beginInfo);
-
-        // Transition image layout to TRANSFER_DST_OPTIMAL
         VkImageMemoryBarrier barrier = {0};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        static int first = 1;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        barrier.oldLayout = first ? 
-            VK_IMAGE_LAYOUT_UNDEFINED : 
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        first = 0;
         barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -261,7 +340,6 @@
             1, &barrier
         );
 
-        // Copy buffer -> image
         VkBufferImageCopy copyRegion = {0};
         copyRegion.bufferOffset = 0;
         copyRegion.bufferRowLength = 0;
@@ -293,7 +371,6 @@
 
         vkEndCommandBuffer(cmd);
 
-        // Submit command buffer
         VkSubmitInfo submit = {0};
         submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submit.commandBufferCount = 1;
@@ -305,8 +382,46 @@
         vkFreeCommandBuffers(vk_device, commandPool, 1, &cmd);
         vkDestroyBuffer(vk_device, stagingBuffer, NULL);
         vkFreeMemory(vk_device, stagingMemory, NULL);
+    #else
+        if (!ui_pixels) return;
+
+        // Recreate texture if size changed
+        if (width != currentUiWidth || height != currentUiHeight) {
+            create_ui_texture(width, height);
+            // Recreate bind group with new texture view
+            // (for simplicity we recreate bind group here - you can optimize later)
+            if (uiBindGroup) wgpuBindGroupRelease(uiBindGroup);
+            // ... recreate bind group same as in init (copy the code or make a helper)
+            // For now, call ui_renderer_init() again is acceptable for UI
+            ui_renderer_init();   // simple but works
+        }
+        // 1. In your version, it's called WGPUTexelCopyTextureInfo
+        WGPUTexelCopyTextureInfo dst = {
+            .texture = uiTexture,
+            .mipLevel = 0,
+            .origin = {0, 0, 0},
+            .aspect = WGPUTextureAspect_All
+        };
+
+        // 2. In your version, it's called WGPUTexelCopyBufferLayout
+        WGPUTexelCopyBufferLayout layout = {
+            .offset = 0,
+            .bytesPerRow = width * 4,
+            .rowsPerImage = height
+        };
+
+        // 3. In modern WebGPU, this field is depthOrArrayLayers
+        WGPUExtent3D size = { 
+            .width = width, 
+            .height = height, 
+            .depthOrArrayLayers = 1 
+        };
+
+        wgpuQueueWriteTexture(queue, &dst, ui_pixels, (size_t)width * height * 4, &layout, &size);
+    #endif
     }
 
+#ifndef __EMSCRIPTEN__
     static VkShaderModule uiVertModule;
     static VkShaderModule uiFragModule;
 
@@ -347,7 +462,6 @@
         stages[1].module = uiFragModule;
         stages[1].pName = "main";
 
-        // Vertex input (vec2 pos + vec2 uv)
         VkVertexInputBindingDescription binding = {0};
         binding.binding = 0;
         binding.stride = sizeof(float) * 4;
@@ -399,7 +513,6 @@
             VK_COLOR_COMPONENT_B_BIT |
             VK_COLOR_COMPONENT_A_BIT;
 
-        // IMPORTANT: enable alpha blending
         blendAttach.blendEnable = VK_TRUE;
         blendAttach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         blendAttach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -453,23 +566,175 @@
             exit(1);
         }
     }
-
+#endif
     void ui_renderer_init() {
+    #ifndef __EMSCRIPTEN__
     	create_ui_image();
     	create_ui_descriptor();
     	create_ui_pipeline();
     	create_ui_quad();
+    #else
+    printf("Creating WebGPU UI Renderer...\n");
+
+    // Initial texture (default size)
+    create_ui_texture(1280, 720);
+
+    // Sampler
+    WGPUSamplerDescriptor sampDesc = {0};
+    sampDesc.magFilter = WGPUFilterMode_Nearest;
+    sampDesc.minFilter = WGPUFilterMode_Nearest;
+    sampDesc.addressModeU = WGPUAddressMode_ClampToEdge;
+    sampDesc.addressModeV = WGPUAddressMode_ClampToEdge;
+    sampDesc.addressModeW = WGPUAddressMode_ClampToEdge;
+    sampDesc.maxAnisotropy = 1;
+    uiSampler = wgpuDeviceCreateSampler(device, &sampDesc);
+
+    // Vertex buffer (full-screen quad)
+    float quadVerts[] = {
+        -1.0f, -1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 1.0f,
+        -1.0f,  1.0f,  0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 0.0f
+    };
+
+    WGPUBufferDescriptor vbDesc = {0};
+    vbDesc.usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst;
+    vbDesc.size = sizeof(quadVerts);
+    uiVertexBuffer = wgpuDeviceCreateBuffer(device, &vbDesc);
+    wgpuQueueWriteBuffer(queue, uiVertexBuffer, 0, quadVerts, sizeof(quadVerts));
+
+    // === Bind Group Layout ===
+    WGPUBindGroupLayoutEntry entries[2] = {0};
+
+    // Texture Binding
+    entries[0].binding = 0;
+    entries[0].visibility = WGPUShaderStage_Fragment;
+    entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+    entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+
+    // Sampler Binding (MISSING IN YOUR ORIGINAL CODE)
+    entries[1].binding = 1;
+    entries[1].visibility = WGPUShaderStage_Fragment;
+    entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
+
+    WGPUBindGroupLayoutDescriptor layoutDesc = {0};
+    layoutDesc.entryCount = 2; // Change to 2
+    layoutDesc.entries = entries;
+
+    WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &layoutDesc);
+
+    // === Pipeline Layout ===
+    WGPUPipelineLayoutDescriptor plDesc = {0};
+    plDesc.bindGroupLayoutCount = 1;
+    plDesc.bindGroupLayouts = &bindGroupLayout;
+    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &plDesc);
+
+    // === Shader ===
+    const char* wgsl = 
+        "@group(0) @binding(0) var uiTexture : texture_2d<f32>;\n"
+        "@group(0) @binding(1) var uiSampler : sampler;\n"
+
+        "struct VSOut {\n"
+        "    @builtin(position) pos : vec4<f32>,\n"
+        "    @location(0) uv : vec2<f32>\n"
+        "};\n"
+
+        "@vertex fn vs_main(@location(0) pos : vec2<f32>, @location(1) uv : vec2<f32>) -> VSOut {\n"
+        "    var out : VSOut;\n"
+        "    out.pos = vec4<f32>(pos, 0.0, 1.0);\n"
+        "    out.uv = -uv;\n"
+        "    return out;\n"
+        "}\n"
+
+        "@fragment fn fs_main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {\n"
+        "    return vec4<f32>(1.0, 1.0, 1.0, 1.0);\n"
+        "}\n";
+
+    WGPUShaderModule shader = create_shader_module(device, wgsl, "UIShader");
+
+    // Vertex layout (pos + uv)
+    WGPUVertexAttribute attrs[2] = {
+        { .format = WGPUVertexFormat_Float32x2, .offset = 0,  .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 8,  .shaderLocation = 1 }
+    };
+    WGPUVertexBufferLayout vbLayout = {
+        .arrayStride = 16,
+        .attributeCount = 2,
+        .attributes = attrs
+    };
+
+    WGPUColorTargetState colorTarget = {0};
+    colorTarget.format = swapchainFormat;
+
+    // 1. Define the blend state as a separate variable
+    WGPUBlendState blendState = {
+        .color = { 
+            .operation = WGPUBlendOperation_Add, 
+            .srcFactor = WGPUBlendFactor_SrcAlpha, 
+            .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha 
+        },
+        .alpha = { 
+            .operation = WGPUBlendOperation_Add, 
+            .srcFactor = WGPUBlendFactor_One, 
+            .dstFactor = WGPUBlendFactor_Zero 
+        }
+    };
+
+    // 2. Assign the address of that variable to the target
+    colorTarget.blend = &blendState;
+
+    const char* vs_entry = "vs_main";
+    const char* fs_entry = "fs_main";
+
+    WGPUFragmentState fragment = {
+        .module = shader,
+        .entryPoint = (WGPUStringView){.data = fs_entry, .length = strlen(fs_entry)},
+        .targetCount = 1,
+        .targets = &colorTarget
+    };
+
+    WGPURenderPipelineDescriptor desc = {0};
+    desc.layout = pipelineLayout;
+
+    desc.vertex.module = shader;
+    desc.vertex.entryPoint = (WGPUStringView){.data = vs_entry, .length = strlen(vs_entry)};
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &vbLayout;
+    desc.fragment = &fragment;
+    desc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
+    //desc.primitive.cullMode = WGPUCullMode_None;
+    desc.multisample.count = 1;
+    desc.label = (WGPUStringView){ .data = "UIPipeline", .length = 10 };
+
+    uiPipeline = wgpuDeviceCreateRenderPipeline(device, &desc);
+
+    // === Create Bind Group ===
+    WGPUBindGroupEntry bgEntries[2] = {0};
+
+    // Texture View
+    bgEntries[0].binding = 0;
+    bgEntries[0].textureView = uiTextureView;
+
+    // Sampler (MISSING IN YOUR ORIGINAL CODE)
+    bgEntries[1].binding = 1;
+    bgEntries[1].sampler = uiSampler;
+
+    WGPUBindGroupDescriptor bgDesc = {0};
+    bgDesc.layout = bindGroupLayout;
+    bgDesc.entryCount = 2; // Change to 2
+    bgDesc.entries = bgEntries;
+
+    uiBindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
+
+    printf("WebGPU UI pipeline + bind group created with alpha blending\n");
+    #endif
     }
 
+#ifndef __EMSCRIPTEN__
     void ui_renderer_draw(VkCommandBuffer cmd) {
-        // Bind the UI pipeline
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, uiPipeline);
-
-        // Bind vertex buffer
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmd, 0, 1, &uiVertexBuffer, offsets);
-
-        // Bind descriptor set
         vkCmdBindDescriptorSets(
             cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -478,8 +743,6 @@
             &uiDescriptorSet,
             0, NULL
         );
-
-        // Set dynamic viewport & scissor
         VkViewport vp = {0};
         vp.x = 0.0f;
         vp.y = 0.0f;
@@ -488,13 +751,31 @@
         vp.minDepth = 0.0f;
         vp.maxDepth = 1.0f;
         vkCmdSetViewport(cmd, 0, 1, &vp);
-
         VkRect2D scissor = {0};
         scissor.offset = (VkOffset2D){0, 0};
         scissor.extent = swapchainExtent;
         vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-        // Draw quad (4 vertices)
         vkCmdDraw(cmd, 4, 1, 0, 0);
+    }
+#endif
+
+#ifdef __EMSCRIPTEN__
+    void ui_renderer_draw(WGPURenderPassEncoder pass)
+    {
+        if (!uiPipeline || !uiBindGroup) return;
+        wgpuRenderPassEncoderSetPipeline(pass, uiPipeline);
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, uiBindGroup, 0, NULL);
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, uiVertexBuffer, 0, sizeof(quadVerts));
+        wgpuRenderPassEncoderDraw(pass, 4, 1, 0, 0);
+    }
+
+    void ui_renderer_cleanup(void)
+    {
+        if (uiPipeline) wgpuRenderPipelineRelease(uiPipeline);
+        if (uiBindGroup) wgpuBindGroupRelease(uiBindGroup);
+        if (uiVertexBuffer) wgpuBufferRelease(uiVertexBuffer);
+        if (uiTextureView) wgpuTextureViewRelease(uiTextureView);
+        if (uiTexture) wgpuTextureRelease(uiTexture);
+        if (uiSampler) wgpuSamplerRelease(uiSampler);
     }
 #endif

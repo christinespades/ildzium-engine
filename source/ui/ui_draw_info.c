@@ -2,6 +2,7 @@
 #include "ui_draw_info.h"
 
 static float info_scroll_x = 0.0f;   // persistent horizontal scroll offset
+extern float g_fps;
 
 // Monospaced font width calculation
 int get_text_width(const char* text, int scale)

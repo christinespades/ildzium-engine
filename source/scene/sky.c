@@ -26,12 +26,11 @@ SkyParameters g_skyParams = {
     .vignetteStrength = 0.4f,
     .overallBrightness = 1.0f
 };
+    SkyUBO skyUBOData = {0};
 
 #ifndef __EMSCRIPTEN__
     static VkBuffer skyUBOBuffer = VK_NULL_HANDLE;
     static VkDeviceMemory skyUBOMemory = VK_NULL_HANDLE;
-    static SkyUBO skyUBOData = {0};
-
     static VkDescriptorSetLayout skyDescriptorSetLayout = VK_NULL_HANDLE;
     static VkDescriptorPool skyDescriptorPool = VK_NULL_HANDLE;
     static VkDescriptorSet skyDescriptorSet = VK_NULL_HANDLE;
@@ -227,7 +226,7 @@ SkyParameters g_skyParams = {
         vkDestroyDescriptorSetLayout(vk_device, skyDescriptorSetLayout, NULL);
         vkDestroyDescriptorPool(vk_device, skyDescriptorPool, NULL);
     }
-
+#endif
     void sky_update(void)
     {
         // Auto cycle
@@ -276,13 +275,18 @@ SkyParameters g_skyParams = {
         skyUBOData.vignetteStrength = g_skyParams.vignetteStrength;
         skyUBOData.overallBrightness = g_skyParams.overallBrightness;
         memcpy(skyUBOData.inverseView, cameraUBOData.inverseView, 16 * sizeof(float));
+    #if !defined(__EMSCRIPTEN__)
         // Upload
         void* data;
         vkMapMemory(vk_device, skyUBOMemory, 0, sizeof(SkyUBO), 0, &data);
         memcpy(data, &skyUBOData, sizeof(SkyUBO));
         vkUnmapMemory(vk_device, skyUBOMemory);
+    #else
+    // On WebGPU we do it in sky_webgpu.c: update_sky_ubo_webgpu() via wgpuQueueWriteBuffer
+    #endif
     }
 
+ #if !defined(__EMSCRIPTEN__)
     void sky_draw(VkCommandBuffer cmd)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipeline);

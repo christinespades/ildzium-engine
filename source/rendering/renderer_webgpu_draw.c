@@ -1,11 +1,9 @@
 #include "pch.h"
 #if defined(__EMSCRIPTEN__)
-    #include "renderer_webgpu.h"
-    #include "scene/camera.h"
-    // in pch.h: #include <webgpu/webgpu.h>
-
+    #include "rendering/renderer_webgpu_draw.h"
     extern CameraUBO cameraUBOData;
     extern WGPUBuffer cameraBuffer;
+    extern void sky_update();
 
     // These globals are defined in renderer_webgpu.c
     extern WGPUDevice        device;
@@ -15,8 +13,7 @@
     extern WGPUBuffer        vertexBuffer;
     extern WGPUBindGroup     bindGroup;
 
-
-    void webgpu_draw(void)
+    void webgpu_draw(float dt)
     {
         if (gpu_state != GPU_STATE_READY) {
             static int once = 0;
@@ -41,17 +38,8 @@
             return;
         }
 
-        WGPUTextureViewDescriptor viewDesc = {0};
-        viewDesc.format          = wgpuTextureGetFormat(surfaceTexture.texture);
-        viewDesc.dimension       = WGPUTextureViewDimension_2D;
-        viewDesc.baseMipLevel    = 0;
-        viewDesc.mipLevelCount   = 1;                         // critical
-        viewDesc.baseArrayLayer  = 0;
-        viewDesc.arrayLayerCount = 1;                         // critical
-        viewDesc.aspect          = WGPUTextureAspect_All;
-        viewDesc.label = (WGPUStringView){ .data = "BackbufferView", .length = WGPU_STRLEN };
-
-        WGPUTextureView backbuffer = wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
+        // You can replace the manual viewDesc setup with this:
+        WGPUTextureView backbuffer = wgpuTextureCreateView(surfaceTexture.texture, NULL);
         if (!backbuffer) {
             printf("Failed to create backbuffer view\n");
             wgpuTextureRelease(surfaceTexture.texture);
@@ -60,33 +48,60 @@
 
         // printf("Rendering frame %d - clear color applied\n", frame); 
 
-        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, NULL);
+        WGPUCommandEncoderDescriptor encDesc = {
+            .label = (WGPUStringView){ .data = "MainFrameEncoder", .length = 16 }
+        };
+        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encDesc);
 
         WGPURenderPassColorAttachment colorAttachment = {0};
         colorAttachment.view = backbuffer;
         colorAttachment.loadOp = WGPULoadOp_Clear;
         colorAttachment.storeOp = WGPUStoreOp_Store;
-        colorAttachment.clearValue = (WGPUColor){0.7f, 0.1f, 0.1f, 1.0f};
+        colorAttachment.clearValue = (WGPUColor){ 
+            (double)sin(frame * 0.01), 
+            0.1, 
+            0.1, 
+            1.0 
+        };
+        colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 
         WGPURenderPassDescriptor passDesc = {0};
+        passDesc.label = (WGPUStringView){ .data = "MainRenderPass", .length = 14 };
         passDesc.colorAttachmentCount = 1;
         passDesc.colorAttachments = &colorAttachment;
+
+        update_sky_ubo_webgpu();
+        sky_update();
+        update_camera_ubo();
+        lights_update(0.15f, 0.15f, 0.15f,      // ambient
+                      1.0f, 1.0f, -1.0f,        // dir direction
+                      1.0f,                     // dir intensity
+                      4,                        // num point lights
+                      camera.x, camera.y, camera.z);   // view pos
 
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
 
         wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, bindGroup, 0, NULL);
-        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, vertexBuffer, 0, sizeof(float)*9);
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, vertexBuffer, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+
+        sky_draw_webgpu(pass);
+
+        draw_models_webgpu(pass);
+
+        if (g_ui_ctx->cursor_captured) {
+            ui_draw(g_ui_ctx, ui_framebuffer, g_width, g_height, dt);
+            ui_renderer_upload(ui_framebuffer, g_width, g_height);
+            ui_renderer_draw(pass);
+        }
+        printf("width: %d\n", g_width);
 
         wgpuRenderPassEncoderEnd(pass);
 
         WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
         wgpuQueueSubmit(queue, 1, &cmd);
 
-        // === IMPORTANT: NO wgpuSurfacePresent() on Web! ===
-
-        // Cleanup
         wgpuTextureViewRelease(backbuffer);
         wgpuTextureRelease(surfaceTexture.texture);
         wgpuCommandBufferRelease(cmd);

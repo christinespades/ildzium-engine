@@ -80,63 +80,41 @@ void camera_get_projection_matrix(float* out_proj, float aspect_ratio)
     out_proj[15] = 0.0f;
 }
 
-// Keep your existing update_camera (unchanged)
 void update_camera(float deltaTime)
 {
     if (g_ui_ctx->cursor_captured) return;
+    camera.x += 1.0f * deltaTime;
 
     float velocity = camera.speed * deltaTime;
     float yawRad = camera.yaw * (PI / 180.0f);
 
-#ifdef __EMSCRIPTEN__
-    // Web version - use our key state array
-    if (g_keys[87]) { // W
+    if (platform_get_key_down(KEY_W)) {
         camera.x += sinf(yawRad) * velocity;
         camera.z += cosf(yawRad) * velocity;
     }
-    if (g_keys[83]) { // S
+    if (platform_get_key_down(KEY_S)) {
         camera.x -= sinf(yawRad) * velocity;
         camera.z -= cosf(yawRad) * velocity;
     }
+
     float strafeYaw = yawRad - (PI / 2.0f);
-    if (g_keys[65]) { // A
+
+    if (platform_get_key_down(KEY_A)) {
         camera.x += sinf(strafeYaw) * velocity;
         camera.z += cosf(strafeYaw) * velocity;
     }
-    if (g_keys[68]) { // D
+    if (platform_get_key_down(KEY_D)) {
         camera.x -= sinf(strafeYaw) * velocity;
         camera.z -= cosf(strafeYaw) * velocity;
     }
-    if (g_keys[32]) { // Space
+
+    // Vertical movement
+    if (platform_get_key_down(KEY_SPACE)) {
         camera.y += velocity;
     }
-    if (g_keys[16]) { // Left Shift (keyCode 16)
+    if (platform_get_key_down(KEY_LEFT_SHIFT)) {
         camera.y -= velocity;
     }
-#else
-    // Native GLFW version (unchanged)
-    if (glfwGetKey(g_window, GLFW_KEY_W) == GLFW_PRESS) {
-        camera.x += sinf(yawRad) * velocity;
-        camera.z += cosf(yawRad) * velocity;
-    }
-    if (glfwGetKey(g_window, GLFW_KEY_S) == GLFW_PRESS) {
-        camera.x -= sinf(yawRad) * velocity;
-        camera.z -= cosf(yawRad) * velocity;
-    }
-    float strafeYaw = yawRad - (PI / 2.0f);
-    if (glfwGetKey(g_window, GLFW_KEY_A) == GLFW_PRESS) {
-        camera.x += sinf(strafeYaw) * velocity;
-        camera.z += cosf(strafeYaw) * velocity;
-    }
-    if (glfwGetKey(g_window, GLFW_KEY_D) == GLFW_PRESS) {
-        camera.x -= sinf(strafeYaw) * velocity;
-        camera.z -= cosf(strafeYaw) * velocity;
-    }
-    if (glfwGetKey(g_window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        camera.y += velocity;
-    if (glfwGetKey(g_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        camera.y -= velocity;
-#endif
 }
 
 void update_camera_ubo(void)
@@ -145,34 +123,52 @@ void update_camera_ubo(void)
 
     camera_get_view_matrix(view);
 #ifdef __EMSCRIPTEN__
-    // WebGPU version - use global width/height (you already have g_width / g_height)
     float aspect = (float)g_width / (float)g_height;
+    printf("Camera UBO update - pos: (%.2f, %.2f, %.2f)  yaw: %.1f  pitch: %.1f  aspect: %.3f\n", 
+               camera.x, camera.y, camera.z, camera.yaw, camera.pitch, aspect);
 #else
-    // Vulkan / GLFW version
     float aspect = (float)swapchainExtent.width / (float)swapchainExtent.height;
 #endif
     camera_get_projection_matrix(proj, aspect);
+
+#ifdef __EMSCRIPTEN__
+    // 1. Flip Y for WebGPU (Vulkan is Y-down, WebGPU is Y-up)
+    proj[5] *= -1.0f;
 
     if (!matrix_inverse(view, invView)) {
         // Fallback to identity if inversion fails (should rarely happen)
         matrix_identity(invView);
     }
 
-    // Copy to camera UBO (keep your existing cameraUBOData)
+    if (cameraBuffer) {
+            // We need a temp struct to hold the TRANSPOSED matrices for WebGPU
+            CameraUBO transposedUBO;
+            
+            // Helper to transpose into the new struct
+            for (int r = 0; r < 4; r++) {
+                for (int c = 0; c < 4; c++) {
+                    transposedUBO.view[c * 4 + r] = view[r * 4 + c];
+                    transposedUBO.proj[c * 4 + r] = proj[r * 4 + c];
+                    transposedUBO.inverseView[c * 4 + r] = invView[r * 4 + c];
+                }
+            }
+
+            // Upload the WHOLE struct (192 bytes)
+            wgpuQueueWriteBuffer(queue, cameraBuffer, 0, &transposedUBO, sizeof(CameraUBO));
+        }
+#else
+    if (!matrix_inverse(view, invView)) {
+        // Fallback to identity if inversion fails (should rarely happen)
+        matrix_identity(invView);
+    }
+
     memcpy(cameraUBOData.view, view, 16 * sizeof(float));
     memcpy(cameraUBOData.proj, proj, 16 * sizeof(float));
-    memcpy(cameraUBOData.inverseView, invView, 16 * sizeof(float));  // Add this field to CameraUBO
+    memcpy(cameraUBOData.inverseView, invView, 16 * sizeof(float));
 
-    #ifdef __EMSCRIPTEN__
-        // WebGPU: write directly to GPU buffer via queue
-        if (cameraBuffer) {
-            wgpuQueueWriteBuffer(queue, cameraBuffer, 0, &cameraUBOData, sizeof(CameraUBO));
-        }
-    #else
-        // Vulkan: map + memcpy + unmap
-        void* data;
-        vkMapMemory(vk_device, cameraUBOMemory, 0, sizeof(CameraUBO), 0, &data);
-        memcpy(data, &cameraUBOData, sizeof(CameraUBO));
-        vkUnmapMemory(vk_device, cameraUBOMemory);
-    #endif
+    void* data;
+    vkMapMemory(vk_device, cameraUBOMemory, 0, sizeof(CameraUBO), 0, &data);
+    memcpy(data, &cameraUBOData, sizeof(CameraUBO));
+    vkUnmapMemory(vk_device, cameraUBOMemory);
+#endif
 }

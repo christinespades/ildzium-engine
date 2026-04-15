@@ -112,7 +112,6 @@ if errorlevel 1 (
 if exist "%BUILD_DIR%\%OUT_EXE%" (
     echo.
 
-    :: Copy GLFW DLL next to the exe (required for runtime)
     if exist "%GLFW_DLL%" (
         copy /Y "%GLFW_DLL%" "%BUILD_DIR%\"
     ) else (
@@ -140,14 +139,9 @@ if exist "%BUILD_DIR%\%OUT_EXE%" (
 goto END
 
 :BUILD_WEB
-
-echo Building WEB (WASM + WebGPU)
-echo ====================================
-
 set WEB_BUILD_DIR=..\builds\web
 if not exist %WEB_BUILD_DIR% mkdir %WEB_BUILD_DIR%
 
-:: Collect sources
 set "SRC_FILES="
 for /R ..\source %%f in (*.c) do (
     if /I not "%%~nxf"=="pch.c" (
@@ -158,6 +152,7 @@ for /R ..\source %%f in (*.c) do (
 emcc %SRC_FILES% ^
     -I"..\source" ^
     -I"%THIRDPARTY_INCLUDE%" ^
+    -I"..\thirdparty" ^
     -O2 ^
     --use-port=emdawnwebgpu ^
     -s FULL_ES3=1 ^
@@ -173,7 +168,7 @@ emcc %SRC_FILES% ^
     -s EXPORTED_FUNCTIONS="['_main','_on_http_result']" ^
     -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
     --js-library "..\source\platform\web\library_http.js" ^
-    -o "%WEB_BUILD_DIR%\index.html"
+    --shell-file shell.html -o "%WEB_BUILD_DIR%\index.html"
 
 xcopy /E /I /Y ..\assets %WEB_BUILD_DIR%\assets
 xcopy /Y ..\web\* %WEB_BUILD_DIR%\

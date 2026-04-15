@@ -1,21 +1,11 @@
 #include "pch.h"
 #include "main.h"
-#include "core/debug.h"
-#include "core/exceptions.h"
-#include "core/platform.h"
-#include "core/watcher.h"
-#include "input/input.h"
-#include "rendering/surface.h"
-#include "scene/camera.h"
-#include "scene/model.h"
-#include "ui/ui.h"
 
 static int g_target_fps = 60;
-void draw_frame();
-
 double lastTime;
 double last_render_time;
 double frame_duration;
+float g_fps = 0.0f;
 
 void init()
 {
@@ -26,11 +16,20 @@ void init()
         SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
         SymInitialize(process, "srv*C:\\symbols*https://msdl.microsoft.com/download/symbols", TRUE);
         watcher_init();
+        init_window();
+        create_vk_instance();
+        create_vk_surface();
+        vulkan_init();
+    #else
+        init_window();
+        webgpu_init();
     #endif
 
-    init_platform();
+    init_input();
+    g_ui_ctx = malloc(sizeof(UI_Context));
+    ui_init(g_ui_ctx);
     init_camera();
-    lastTime = platform_get_time();
+    lastTime = ildz_get_time();
     last_render_time = lastTime;
     frame_duration = 1.0 / (double)g_target_fps;
 }
@@ -42,18 +41,20 @@ void engine_tick()
     watcher_update();
     glfwPollEvents();
 #endif
-    double currentTime = platform_get_time();
+    double currentTime = ildz_get_time();
     float deltaTime = (float)(currentTime - lastTime);
     lastTime = currentTime;
     update_camera(deltaTime);
     int left_pressed = platform_get_mouse_button(0);
 
     if (g_ui_ctx->cursor_captured) {
+        //printf("Cursor captured\n");
+
         double mx, my;
         platform_get_mouse_pos(&mx, &my);
 
         int win_w, win_h;
-        platform_get_window_size(&win_w, &win_h);
+        ildz_get_window_size(&win_w, &win_h);
 
         if (mx < 0) mx = 0;
         if (my < 0) my = 0;
@@ -65,7 +66,7 @@ void engine_tick()
     }
 
 #ifdef __EMSCRIPTEN__
-    webgpu_draw();
+    webgpu_draw(deltaTime);
 #else  
     if ((currentTime - last_render_time) >= (1.0 / g_target_fps))
     {
@@ -82,7 +83,7 @@ int main()
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(engine_tick, 0, 1);   // 0 = use requestAnimationFrame
 #else
-    while (!platform_should_close())
+    while (!ildz_should_close())
     {
         engine_tick();
     }
@@ -94,8 +95,7 @@ int main()
     free(g_ui_ctx);
     
 #ifndef __EMSCRIPTEN__
-    platform_shutdown();
+    vulkan_glfw_shutdown();
 #endif
-
     return 0;
 }

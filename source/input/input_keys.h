@@ -5,6 +5,7 @@
 #include "input/input_keys_mods.h"
 #include "scene/camera.h"
 #include "ui/ui.h"
+#include "ui/ui_context.h"
 #include "ui/ui_editor.h"
     
 extern UI_Context* g_ui_ctx;

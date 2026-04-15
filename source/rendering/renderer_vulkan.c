@@ -14,6 +14,7 @@
     #include "scene/sky.h"
 
     extern CameraUBO cameraUBOData;
+    extern VkDevice vk_device;
     extern VkInstance vk_instance;
     extern VkSurfaceKHR vk_surface;
 
@@ -37,7 +38,7 @@
     VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
     void vulkan_init();
-    void vulkan_shutdown();
+    void vulkan_glfw_shutdown();
     extern void vulkan_draw();
 
     static void create_depth_resources(void);
@@ -160,16 +161,7 @@
                              &cameraUBOBuffer, &cameraUBOMemory);
     }
 
-    void vulkan_init()
-    {
-        if (ui_framebuffer) {
-            free(ui_framebuffer);           // avoid memory leak if called multiple times
-        }
-
-        pick_physical_device(vk_instance, vk_surface);
-        create_logical_device();
-
-        // === SWAPCHAIN ===
+    void create_swapchain() {
         VkSurfaceCapabilitiesKHR surfaceCaps;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, vk_surface, &surfaceCaps);
 
@@ -268,7 +260,83 @@
         // Zero the buffer (clear to transparent black)
         memset(ui_framebuffer, 0, 
                (size_t)swapchainExtent.width * swapchainExtent.height * sizeof(uint32_t));
+    }
 
+    void cleanup_swapchain()
+    {
+        if (ui_framebuffer) {
+            free(ui_framebuffer);
+            ui_framebuffer = NULL;
+        }
+
+        // Framebuffers
+        if (framebuffers) {
+            for (uint32_t i = 0; i < swapchainImageCount; i++) {
+                vkDestroyFramebuffer(vk_device, framebuffers[i], NULL);
+            }
+            free(framebuffers);
+            framebuffers = NULL;
+        }
+
+        // Depth
+        if (depthImageView) vkDestroyImageView(vk_device, depthImageView, NULL);
+        if (depthImage)     vkDestroyImage(vk_device, depthImage, NULL);
+        if (depthMemory)    vkFreeMemory(vk_device, depthMemory, NULL);
+
+        depthImageView = VK_NULL_HANDLE;
+        depthImage = VK_NULL_HANDLE;
+        depthMemory = VK_NULL_HANDLE;
+
+        // Swapchain image views
+        if (swapchainImageViews) {
+            for (uint32_t i = 0; i < swapchainImageCount; i++) {
+                vkDestroyImageView(vk_device, swapchainImageViews[i], NULL);
+            }
+            free(swapchainImageViews);
+            swapchainImageViews = NULL;
+        }
+
+        // Swapchain images array (just free, not destroy)
+        if (swapchainImages) {
+            free(swapchainImages);
+            swapchainImages = NULL;
+        }
+
+        // Swapchain
+        if (swapchain) {
+            vkDestroySwapchainKHR(vk_device, swapchain, NULL);
+            swapchain = VK_NULL_HANDLE;
+        }
+    }
+
+    void recreate_swapchain()
+    {
+        int width = 0, height = 0;
+
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(g_window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(vk_device);
+
+        cleanup_swapchain();
+
+        create_swapchain();
+        create_depth_resources();
+        create_framebuffers();
+
+        ui_renderer_resize(swapchainExtent.width, swapchainExtent.height);
+    }
+
+    void vulkan_init()
+    {
+        if (ui_framebuffer) {
+            free(ui_framebuffer);           // avoid memory leak if called multiple times
+        }
+        pick_physical_device(vk_instance, vk_surface);
+        create_logical_device();
+        create_swapchain();
         create_depth_resources();           // ← new
         create_render_pass();               // ← updated
         create_framebuffers();              // ← updated (now 2 attachments)
@@ -310,7 +378,7 @@
         printf("Renderer initialized\n");
     }
 
-    void vulkan_shutdown()
+    void vulkan_glfw_shutdown()
     {
         vkDeviceWaitIdle(vk_device);
 
@@ -345,5 +413,9 @@
         vkDestroyRenderPass(vk_device, renderPass, NULL);
         vkDestroySwapchainKHR(vk_device, swapchain, NULL);
         vkDestroyDevice(vk_device, NULL);
+        vkDestroySurfaceKHR(vk_instance, vk_surface, NULL);
+        vkDestroyInstance(vk_instance, NULL);
+        glfwDestroyWindow(g_window);
+        glfwTerminate();
     }
 #endif
