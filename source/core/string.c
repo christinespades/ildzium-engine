@@ -5,18 +5,6 @@ int is_word_char(char c) {
     return isalnum((unsigned char)c) || c == '_';
 }
 
-char* platform_strdup(const char* s)
-{
-    if (!s) return NULL;
-
-    size_t len = strlen(s) + 1;
-    char* out = (char*)malloc(len);
-    if (!out) return NULL;
-
-    memcpy(out, s, len);
-    return out;
-}
-
 void wrap_text(const char* src, char* dst, size_t cap, int max_chars)
 {
     size_t dst_len = 0;

@@ -160,11 +160,12 @@ emcc %SRC_FILES% ^
     -s ALLOW_TABLE_GROWTH=1 ^
     -s RESERVED_FUNCTION_POINTERS=64 ^
     -s WASM=1 ^
+    -s FETCH=1 ^
     -s ASSERTIONS=1 ^
     -s ENVIRONMENT=web ^
     -s MODULARIZE=1 ^
     -s EXPORT_ES6=0 ^
-    -sASYNCIFY=1 ^
+    -s ASYNCIFY=1 ^
     -s EXPORTED_FUNCTIONS="['_main','_on_http_result']" ^
     -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
     --js-library "..\source\platform\web\library_http.js" ^

@@ -30,6 +30,10 @@ void on_meshes_clicked(void) {
     if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_MESHES);
 }
 
+void on_project_clicked(void) {
+    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_PROJECT);
+}
+
 void on_skybox_clicked(void) {
     if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_SKYBOX);
 }

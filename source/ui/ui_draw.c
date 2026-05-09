@@ -131,26 +131,44 @@ void ui_draw(UI_Context* ctx, uint32_t* fb, int fb_width, int fb_height, float d
             draw_editor(b, fb, fb_width, fb_height, dt);
             draw_scrollbar(b, fb, fb_width, fb_height);
         }
+        
         // Normal scrollable or static text button
-        else if (b->content && b->content[0]) {
+        else if (b->content && b->content[0])
+        {
             int padding = 12;
             int scale = 1;
             int line_h = FONT_HEIGHT * scale + 8;
-            int tx = b->x + padding;
-            int ty = b->y + padding;
 
-            if (b->is_scrollable) {
-                // Draw with scroll offset
+            if (b->is_scrollable)
+            {
+                // === Calculate content height if not set ===
+                if (b->content_height <= 0.0f)
+                {
+                    int num_lines = 1;
+                    for (const char* p = b->content; *p; ++p)
+                        if (*p == '\n') num_lines++;
+                    b->content_height = (float)num_lines * line_h;
+                }
+
+                int tx = b->x + padding;
+                int ty = b->y + padding;
+
+                float visible_h = (float)(b->h - 2 * padding);
+                float max_scroll = fmaxf(0.0f, b->content_height - visible_h);
+                b->scroll_offset = fmaxf(0.0f, fminf(b->scroll_offset, max_scroll));
+
                 draw_multiline_text(fb, fb_width, fb_height,
                                     tx, ty - (int)b->scroll_offset,
                                     b->content, COLOR_MAIN_TEXT, scale, line_h, b);
+
                 draw_scrollbar(b, fb, fb_width, fb_height);
-            } 
-            else {
-                // Normal non-scrollable button text
+            }
+            else
+            {
+                // non-scrollable
                 draw_multiline_text(fb, fb_width, fb_height,
-                                    tx, ty, b->content,
-                                    COLOR_MAIN_TEXT, scale, line_h, b);
+                                    b->x + padding, b->y + padding,
+                                    b->content, COLOR_MAIN_TEXT, scale, line_h, b);
             }
         }
     }

@@ -1,11 +1,16 @@
 #include "pch.h"
 #include "scene/model.h"
-#define CGLTF_IMPLEMENTATION
-#define CGLTF_MESHOPT_DECODE 1
-#define MESHOPTIMIZER_IMPLEMENTATION
-#include "cgltf.h"
-
-#ifndef __EMSCRIPTEN__
+ModelSystem g_model_system = {0};
+#ifdef __EMSCRIPTEN__
+    #define _strdup strdup
+    extern WGPUDevice device;
+    extern const char* model_vertex_wgsl;
+    extern const char* model_fragment_wgsl;
+#else
+    #define CGLTF_IMPLEMENTATION
+    #define CGLTF_MESHOPT_DECODE 1
+    #define MESHOPTIMIZER_IMPLEMENTATION
+    #include "cgltf.h"
     extern uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     extern VkDevice vk_device;
     extern VkPipeline modelPipeline;
@@ -247,57 +252,6 @@
     }
 #endif
 
-    void init_model_system(void)
-    {
-    #ifdef __EMSCRIPTEN__
-        create_model_bind_group_layout();
-        create_model_pipeline_webgpu();
-    #else
-        create_model_descriptors();
-        create_model_pipeline();
-    #endif
-        g_model_system.models = NULL;
-        g_model_system.modelCount = 0;
-        g_model_system.modelCapacity = 0;
-
-        g_model_system.instances = NULL;
-        g_model_system.instanceCount = 0;
-        g_model_system.instanceCapacity = 256;           // reasonable starting size
-        g_model_system.instances = malloc(g_model_system.instanceCapacity * sizeof(InstanceData));
-    #ifdef __EMSCRIPTEN__
-        WGPUBufferDescriptor bufDesc = {
-            .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-            .size = g_model_system.instanceCapacity * sizeof(InstanceData),
-            .mappedAtCreation = false
-        };
-        g_model_system.instanceBuffer = wgpuDeviceCreateBuffer(device, &bufDesc);
-    #else
-        g_model_system.instanceBuffer = VK_NULL_HANDLE;
-        g_model_system.instanceMemory = VK_NULL_HANDLE;
-        g_model_system.instanceBufferSize = 0;
-
-        create_instance_buffer(g_model_system.instanceCapacity);
-
-        // Add many instances
-        for (int i = 0; i < 200; i++) {
-            float transform[16] = {0}; // fill with your TRS matrix
-            matrix_identity(transform);
-
-            // matrix_scale(transform, 0.0075f, 0.075f, 0.075f);
-
-            transform[3]  = (float)(i % 5) * 14.0f - 28.0f;
-            transform[7]  = 0.0f;
-            transform[11] = (float)(i / 5) * 14.0f - 18.0f;
-
-            float color[4] = {0.2f + (i%5)*0.2f, 0.6f, 0.8f, 1.0f};
-            add_model_instance("../../meshes/cs_goddess_statue_opt.glb", transform, color);
-        }
-
-        update_model_instances();
-        update_model_descriptor();
-    #endif
-    }
-
 #ifdef __EMSCRIPTEN__
     WGPURenderPipeline modelPipeline = NULL;
     WGPUPipelineLayout modelPipelineLayout = NULL;
@@ -394,7 +348,7 @@
             // Binding 0: Camera UBO
             {
                 .binding = 0,
-                .visibility = WGPUShaderStage_VERTEX,
+                .visibility = WGPUShaderStage_Vertex,
                 .buffer = {
                     .type = WGPUBufferBindingType_Uniform,
                     .minBindingSize = sizeof(CameraUBO)
@@ -403,7 +357,7 @@
             // Binding 1: Lighting UBO
             {
                 .binding = 1,
-                .visibility = WGPUShaderStage_VERTEX | WGPUShaderStage_FRAGMENT,
+                .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
                 .buffer = {
                     .type = WGPUBufferBindingType_Uniform,
                     .minBindingSize = sizeof(LightingUBO)
@@ -412,7 +366,7 @@
             // Binding 2: Instance SSBO (storage buffer)
             {
                 .binding = 2,
-                .visibility = WGPUShaderStage_VERTEX,
+                .visibility = WGPUShaderStage_Vertex,
                 .buffer = {
                     .type = WGPUBufferBindingType_ReadOnlyStorage,
                     .minBindingSize = 0   // dynamic size is ok for storage buffers
@@ -438,6 +392,177 @@
     }
 #endif
 
+    void init_model_system(void)
+    {
+    #ifdef __EMSCRIPTEN__
+        create_model_bind_group_layout();
+        create_model_pipeline_webgpu();
+    #else
+        create_model_descriptors();
+        create_model_pipeline();
+    #endif
+        g_model_system.models = NULL;
+        g_model_system.modelCount = 0;
+        g_model_system.modelCapacity = 0;
+
+        g_model_system.instances = NULL;
+        g_model_system.instanceCount = 0;
+        g_model_system.instanceCapacity = 256;           // reasonable starting size
+        g_model_system.instances = malloc(g_model_system.instanceCapacity * sizeof(InstanceData));
+    #ifdef __EMSCRIPTEN__
+        WGPUBufferDescriptor bufDesc = {
+            .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+            .size = g_model_system.instanceCapacity * sizeof(InstanceData),
+            .mappedAtCreation = false
+        };
+        g_model_system.instanceBuffer = wgpuDeviceCreateBuffer(device, &bufDesc);
+    #else
+        g_model_system.instanceBuffer = VK_NULL_HANDLE;
+        g_model_system.instanceMemory = VK_NULL_HANDLE;
+        g_model_system.instanceBufferSize = 0;
+
+        create_instance_buffer(g_model_system.instanceCapacity);
+
+        // Add many instances
+        for (int i = 0; i < 200; i++) {
+            float transform[16] = {0}; // fill with your TRS matrix
+            matrix_identity(transform);
+
+            // matrix_scale(transform, 0.0075f, 0.075f, 0.075f);
+
+            transform[3]  = (float)(i % 5) * 14.0f - 28.0f;
+            transform[7]  = 0.0f;
+            transform[11] = (float)(i / 5) * 14.0f - 18.0f;
+
+            float color[4] = {0.2f + (i%5)*0.2f, 0.6f, 0.8f, 1.0f};
+            add_model_instance("../../meshes/cs_goddess_statue_opt.glb", transform, color);
+        }
+
+        update_model_instances();
+        update_model_descriptor();
+    #endif
+    }
+
+    Model* store_and_free_model(const char* glb_path, Mesh mesh,
+                                 Vertex3D* vertices, uint32_t* indices,
+                                 float* positions, float* normals, float* uvs,
+    #ifndef __EMSCRIPTEN__
+                                 cgltf_data* data // Only exists on Native
+    #else
+                                 void* data // Dummy pointer for Web to keep signature simple
+    #endif
+    )
+    {
+        // === Grow the models array if needed ===
+        if (g_model_system.modelCount >= g_model_system.modelCapacity) {
+            g_model_system.modelCapacity = g_model_system.modelCapacity ? g_model_system.modelCapacity * 2 : 8;
+            g_model_system.models = realloc(g_model_system.models,
+                                            g_model_system.modelCapacity * sizeof(Model));
+        }
+
+        // Store the new Model
+        Model* model = &g_model_system.models[g_model_system.modelCount++];
+        model->name = _strdup(glb_path);           // store full path for simplicity
+        model->mesh = mesh;                       // copy the Mesh struct
+        model->instanceOffset = 0;                // we'll improve this later
+        model->instanceCount = 0;
+
+        // Cleanup temporary CPU data
+        free(vertices);
+        free(indices);
+        free(positions);
+        free(normals);
+        free(uvs);
+    #ifndef __EMSCRIPTEN__
+        cgltf_free(data);
+        printf("Loaded model: %s (%u verts, %u indices)\n", 
+               glb_path, mesh.vertexCount, mesh.indexCount);
+    #endif
+        return model;
+    }
+ 
+#ifdef __EMSCRIPTEN__
+    // Forward declaration so load_model_from_server knows it exists
+    void on_load_success(emscripten_fetch_t *fetch);
+
+    void load_model_from_server(const char* url, Model* model_ptr) {
+        emscripten_fetch_attr_t attr;
+        emscripten_fetch_attr_init(&attr);
+        strcpy(attr.requestMethod, "GET");
+        attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
+        attr.userData = model_ptr; 
+        attr.onsuccess = on_load_success;
+        emscripten_fetch(&attr, url);
+    }
+
+    void on_load_success(emscripten_fetch_t *fetch) {
+        Model* model = (Model*)fetch->userData;
+        uint8_t* buffer = (uint8_t*)fetch->data;
+
+        // 1. Basic GLB Header Validation
+        uint32_t magic = *(uint32_t*)(buffer + 0);
+        if (magic != 0x46546C67) { 
+            printf("Invalid GLB magic!\n");
+            emscripten_fetch_close(fetch);
+            return;
+        }
+
+        // 2. Locate Binary Data
+        uint32_t jsonLen = *(uint32_t*)(buffer + 12);
+        uint32_t binOffset = 12 + 8 + jsonLen; 
+        uint8_t* binData = buffer + binOffset + 8; 
+
+        // 3. Define the data counts 
+        // IMPORTANT: For a custom parser without a JSON engine, 
+        // these usually need to be hardcoded or passed via header.
+        // Assuming a standard single-mesh export:
+        uint32_t vertexCount = 24; // Change this to your actual count
+        uint32_t index_count = 36; // Change this to your actual count
+
+        Mesh mesh = {0};
+        mesh.vertexCount = vertexCount;
+        mesh.indexCount = index_count;
+
+        // Use local pointers instead of mesh.vertexData if 'Mesh' doesn't have those fields
+        void* tempVertexData = binData; 
+        void* tempIndexData = binData + (vertexCount * sizeof(Vertex3D));
+
+        // 4. Create WebGPU GPU buffers
+        {
+            WGPUBufferDescriptor vdesc = {
+                .usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
+                .size = vertexCount * sizeof(Vertex3D),
+                .label = "Vertex Buffer"
+            };
+            mesh.vertexBuffer = wgpuDeviceCreateBuffer(device, &vdesc);
+            wgpuQueueWriteBuffer(queue, mesh.vertexBuffer, 0, tempVertexData, vdesc.size);
+        }
+
+        if (index_count > 0) {
+            WGPUBufferDescriptor idesc = {
+                .usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst,
+                .size = index_count * sizeof(uint32_t),
+                .label = "Index Buffer"
+            };
+            mesh.indexBuffer = wgpuDeviceCreateBuffer(device, &idesc);
+            wgpuQueueWriteBuffer(queue, mesh.indexBuffer, 0, tempIndexData, idesc.size);
+        }
+        
+        // 5. Update the engine's model record
+        model->mesh = mesh;
+        model->isLoaded = true; 
+        
+        printf("Successfully parsed WebGPU model: %s\n", model->name);
+        emscripten_fetch_close(fetch);
+    }
+
+    Model* create_empty_model_entry(const char* path) {
+        // Pass NULLs/0s for the pointers since we don't have data yet
+        Model* model = store_and_free_model(path, (Mesh){0}, NULL, NULL, NULL, NULL, NULL, NULL);
+        return model;
+    }
+#endif
+
     Model* find_or_load_model(const char* glb_path)
     {
         // === 1. First, check if we already loaded this model ===
@@ -447,6 +572,20 @@
             }
         }
 
+    #ifdef __EMSCRIPTEN__
+        // === 2. WebGPU / Server Path ===
+        // We don't use cgltf here. We trigger a fetch to the Render server.
+        // Since we can't return the full model yet, we create an entry 
+        // and mark it as "loading".
+        
+        Model* model = create_empty_model_entry(glb_path);
+        
+        // This is your dedicated function that calls JS/Fetch
+        load_model_from_server(glb_path, model); 
+
+        return model; // Or a 'placeholder' model pointer
+    #else
+        // === 3. Native/Vulkan Path ===
         cgltf_options options = {0};
         cgltf_data* data = NULL;
         cgltf_result result = cgltf_parse_file(&options, glb_path, &data);
@@ -516,38 +655,6 @@
 
         // Create buffers for the mesh
         Mesh mesh = {0};
-    #ifdef __EMSCRIPTEN__
-        mesh.vertexCount = vertexCount;
-        mesh.indexCount = index_count;
-
-        // Store CPU copy for WebGPU (we upload once)
-        mesh.vertexData = malloc(vertexCount * sizeof(Vertex3D));
-        memcpy(mesh.vertexData, vertices, vertexCount * sizeof(Vertex3D));
-
-        if (index_count > 0) {
-            mesh.indexData = malloc(index_count * sizeof(uint32_t));
-            memcpy(mesh.indexData, indices, index_count * sizeof(uint32_t));
-        }
-
-        // Create GPU buffers
-        {
-            WGPUBufferDescriptor vdesc = {
-                .usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
-                .size = vertexCount * sizeof(Vertex3D)
-            };
-            mesh.vertexBuffer = wgpuDeviceCreateBuffer(device, &vdesc);
-            wgpuQueueWriteBuffer(queue, mesh.vertexBuffer, 0, mesh.vertexData, vdesc.size);
-        }
-
-        if (index_count > 0) {
-            WGPUBufferDescriptor idesc = {
-                .usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst,
-                .size = index_count * sizeof(uint32_t)
-            };
-            mesh.indexBuffer = wgpuDeviceCreateBuffer(device, &idesc);
-            wgpuQueueWriteBuffer(queue, mesh.indexBuffer, 0, mesh.indexData, idesc.size);
-        }
-    #else
         VkDeviceSize vsize = vertexCount * sizeof(Vertex3D);
 
         create_vulkan_buffer(vsize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -569,33 +676,10 @@
             mesh.indexCount = (uint32_t)index_count;
         }
         mesh.vertexCount = vertexCount;
-    #endif
-        // === Grow the models array if needed ===
-        if (g_model_system.modelCount >= g_model_system.modelCapacity) {
-            g_model_system.modelCapacity = g_model_system.modelCapacity ? g_model_system.modelCapacity * 2 : 8;
-            g_model_system.models = realloc(g_model_system.models,
-                                            g_model_system.modelCapacity * sizeof(Model));
-        }
-
-        // Store the new Model
-        Model* model = &g_model_system.models[g_model_system.modelCount++];
-        model->name = _strdup(glb_path);           // store full path for simplicity
-        model->mesh = mesh;                       // copy the Mesh struct
-        model->instanceOffset = 0;                // we'll improve this later
-        model->instanceCount = 0;
-
-        // Cleanup temporary CPU data
-        free(vertices);
-        free(indices);
-        free(positions);
-        free(normals);
-        free(uvs);
-        cgltf_free(data);
-
-        printf("Loaded model: %s (%u verts, %u indices)\n", 
-               glb_path, mesh.vertexCount, mesh.indexCount);
-
+        Model* model = store_and_free_model(glb_path, mesh, vertices, indices, positions, normals, uvs, data);
+        model->isLoaded = true; 
         return model;
+    #endif
     }
 
     void cleanup_model_system(void)
@@ -607,8 +691,6 @@
             #ifdef __EMSCRIPTEN__
                 if (m->vertexBuffer) wgpuBufferRelease(m->vertexBuffer);
                 if (m->indexBuffer)  wgpuBufferRelease(m->indexBuffer);
-                free(m->vertexData);
-                free(m->indexData);
             #else
                 vkDestroyBuffer(vk_device, m->vertexBuffer, NULL);
                 vkFreeMemory(vk_device, m->vertexMemory, NULL);

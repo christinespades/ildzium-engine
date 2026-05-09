@@ -10,8 +10,13 @@
 	#include "stb_image.h"
 #elif defined(__EMSCRIPTEN__)
     #include <emscripten.h>
+	#include <emscripten/fetch.h>
 	#include <emscripten/html5.h>
 	#include <webgpu/webgpu.h>
+    #include <dirent.h>
+    #include <sys/stat.h>
+    #include <errno.h>
+    #include <unistd.h>
 #endif
 #include <ctype.h>    // isalnum
 #include <math.h>
@@ -21,3 +26,4 @@
 #include <stdlib.h>   // malloc, free
 #include <string.h>   // strlen, strcpy, memset
 #include <threads.h>        // C11 threads
+#include <time.h>

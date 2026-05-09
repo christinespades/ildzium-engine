@@ -4,10 +4,10 @@
 #include "rendering/renderer.h"
 #include "ui/ui.h"
 
-#ifdef __EMSCRIPTEN__
-    extern int g_width;
-    extern int g_height;
-#else
+extern int g_width;
+extern int g_height;
+    
+#ifndef __EMSCRIPTEN__
     extern GLFWwindow* g_window;
     extern VkInstance vk_instance;
     extern VkSurfaceKHR vk_surface;

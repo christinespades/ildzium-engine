@@ -9,6 +9,7 @@ extern void setup_input_controls(UI_Context* ctx);
 extern void setup_lights_controls(UI_Context* ctx);
 extern void setup_main_controls(UI_Context* ctx);
 extern void setup_meshes_controls(UI_Context* ctx);
+extern void setup_project_controls(UI_Context* ctx);
 extern void setup_skybox_controls(UI_Context* ctx);
 extern void setup_sounds_controls(UI_Context* ctx);
 extern void setup_terrain_controls(UI_Context* ctx);
@@ -48,6 +49,7 @@ static void add_top_navigation_buttons(UI_Context* ctx) {
     add_top_button(ctx, &x, top_y, btn_w, spacing, "LIGHTS",  on_lights_clicked);
     add_top_button(ctx, &x, top_y, btn_w, spacing, "MAIN",    on_main_clicked);
     add_top_button(ctx, &x, top_y, btn_w, spacing, "MESHES",  on_meshes_clicked);
+    add_top_button(ctx, &x, top_y, btn_w, spacing, "PROJECT", on_project_clicked);
     add_top_button(ctx, &x, top_y, btn_w, spacing, "SKYBOX",  on_skybox_clicked);
     add_top_button(ctx, &x, top_y, btn_w, spacing, "SOUNDS",  on_sounds_clicked);
     add_top_button(ctx, &x, top_y, btn_w, spacing, "TERRAIN", on_terrain_clicked);
@@ -87,6 +89,10 @@ void ui_set_mode(UI_Context* ctx, UI_Mode mode) {
             setup_meshes_controls(ctx);
             break;
 
+        case UI_MODE_PROJECT:
+            setup_project_controls(ctx);
+            break;
+
         case UI_MODE_SKYBOX:
             setup_skybox_controls(ctx);
             break;
@@ -113,7 +119,7 @@ void ui_init(UI_Context* ctx) {
 #else
     ctx->cursor_captured = 0;        // start with cursor disabled (camera mode)
 #endif
-    
+
     g_ui_ctx = ctx;                    // <-- important for callbacks
     ctx->current_mode = UI_MODE_MAIN;
 

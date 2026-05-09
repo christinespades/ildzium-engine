@@ -1,7 +1,10 @@
 #include "pch.h"
 #include "scene/model_draw.h"
-
 #ifdef __EMSCRIPTEN__
+	extern WGPUDevice device;
+	extern WGPURenderPipeline modelPipeline;
+	extern WGPUBindGroupLayout    modelBindGroupLayout;
+
 	void draw_models_webgpu(WGPURenderPassEncoder pass)
 	{
 	    if (g_model_system.modelCount == 0 || g_model_system.instanceCount == 0) return;

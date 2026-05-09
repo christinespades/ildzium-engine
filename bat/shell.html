@@ -29,5 +29,21 @@ Module({
 });
 </script>
 
+import { initWebGPU, webgpuRenderFrame } from './webgpu.js';
+
+Module.onRuntimeInitialized = async () => {
+    const success = await initWebGPU();
+    if (success) {
+        // Call your C init if needed
+        Module.ccall('webgpu_c_init', 'void', [], []);
+        
+        // Set main loop
+        emscripten_set_main_loop(() => {
+            webgpuRenderFrame();           // JS does the actual rendering
+            Module.ccall('game_update', 'void', ['number'], [1/60]); // your C logic
+        }, 0, true);
+    }
+};
+
 </body>
 </html>

@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "main.h"
-
+#include "rendering/renderer_webgpu_draw.h"
 static int g_target_fps = 60;
 double lastTime;
 double last_render_time;

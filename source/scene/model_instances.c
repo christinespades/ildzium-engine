@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "scene/model_instances.h"
+#ifdef __EMSCRIPTEN__
+	extern WGPUDevice device;
+#endif
 
 #ifndef __EMSCRIPTEN__
 	void create_instance_buffer(uint32_t capacity)

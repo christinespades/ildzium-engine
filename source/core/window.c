@@ -1,14 +1,13 @@
 #include "pch.h"
 #include "core/window.h"
 
-#ifdef __EMSCRIPTEN__
-    int g_width = 1280;
-    int g_height = 720;
-#else
+#ifndef __EMSCRIPTEN__
     #define STB_IMAGE_IMPLEMENTATION
 	#include "stb_image.h"
     GLFWwindow* g_window = NULL;
 #endif
+    int g_width = 1280;
+    int g_height = 720;
 
 #ifdef __EMSCRIPTEN__
     static EM_BOOL on_resize(int eventType, const EmscriptenUiEvent* e, void* userData)
@@ -39,6 +38,8 @@
 	static void framebuffer_resize_callback(GLFWwindow* window, int width, int height)
 	{
 	    framebufferResized = 1;
+	    g_width = width;
+	    g_height = height;
 	}
 #endif
 

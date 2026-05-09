@@ -202,7 +202,10 @@
 
     void sky_draw_webgpu(WGPURenderPassEncoder pass)
     {
-        if (!skyPipeline || !skyBindGroup) return;
+        if (!skyPipeline || !skyBindGroup) {
+            printf ("no sky!");
+            return;
+        }
 
         wgpuRenderPassEncoderSetPipeline(pass, skyPipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, skyBindGroup, 0, NULL);

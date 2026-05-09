@@ -7,6 +7,7 @@ typedef enum {
     UI_MODE_LIGHTS,
     UI_MODE_MAIN,
     UI_MODE_MESHES,
+    UI_MODE_PROJECT,
     UI_MODE_SKYBOX,
     UI_MODE_SOUNDS,
     UI_MODE_TERRAIN,

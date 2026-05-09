@@ -38,6 +38,7 @@
         Mesh  mesh;                    // ← changed: single Mesh for now (easier)
         uint32_t instanceOffset;       // start index in the big instance buffer
         uint32_t instanceCount;        // how many instances of THIS model
+        bool isLoaded;
     } Model;
 
     typedef struct {
@@ -57,7 +58,7 @@
     #endif
     } ModelSystem;
 
-    ModelSystem g_model_system;
+    extern ModelSystem g_model_system;
 
 #ifndef __EMSCRIPTEN__
     VkPipeline modelPipeline;

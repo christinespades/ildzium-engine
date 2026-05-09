@@ -62,6 +62,28 @@ void webgpu_init(void)
     printf("WebGPU initialization completed successfully\n");
 }
 
+void my_error_callback(WGPUErrorType type, const char* message, void* userdata)
+{
+    const char* typeStr = "Unknown";
+    switch (type) {
+        case WGPUErrorType_NoError:     typeStr = "NoError"; break;
+        case WGPUErrorType_Validation:  typeStr = "Validation"; break;
+        case WGPUErrorType_OutOfMemory: typeStr = "OutOfMemory"; break;
+        case WGPUErrorType_Internal:    typeStr = "Internal"; break;
+        case WGPUErrorType_Unknown:     typeStr = "Unknown"; break;
+        // WGPUErrorType_DeviceLost may not exist in your webgpu.h yet
+        // case WGPUErrorType_DeviceLost:  typeStr = "DeviceLost"; break;
+        default:                        typeStr = "Other"; break;
+    }
+
+    printf("WebGPU Uncaptured Error (%s): %s\n", typeStr, message ? message : "(no message)");
+
+    // Optional: Also print to browser console via EM_ASM
+    EM_ASM({
+        console.error("WebGPU Error:", UTF8ToString($0), " - ", UTF8ToString($1));
+    }, typeStr, message ? message : "(no message)");
+}
+
 static void onAdapterRequest(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* userdata1, void* userdata2)
 {
     if (status != WGPURequestAdapterStatus_Success) {
@@ -89,6 +111,14 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     }
 
     device = dev;
+    EM_ASM({
+            console.log('✅ Device created from C (pointer:', $0, ')');
+
+            // Try to hook into any global error we can
+            if (typeof navigator !== 'undefined' && navigator.gpu) {
+                console.log('WebGPU is available in browser');
+            }
+        }, device);
     queue = wgpuDeviceGetQueue(device);
 
     WGPUSurfaceCapabilities caps = {0};
@@ -145,6 +175,8 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
 
     WGPUShaderModule shader = wgpuDeviceCreateShaderModule(device, &shaderDesc);
 
+    printf("Shader module created (handle: %p)\n", (void*)shader);
+
     /* Bind group layout */
     WGPUBindGroupLayoutEntry entry = {0};
     entry.binding = 0;
@@ -189,6 +221,13 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
     multisample.mask = 0xFFFFFFFF;
     multisample.alphaToCoverageEnabled = false;
 
+    // Push error scope before pipeline creation
+        EM_ASM({
+            if (Module && Module['device']) {
+                Module['device'].pushErrorScope('validation');
+            }
+        }, device);   // try with device pointer
+
     WGPURenderPipelineDescriptor pipeDesc = {0};
     pipeDesc.layout = pipelineLayout;
     pipeDesc.vertex.module = shader;
@@ -202,8 +241,25 @@ static void onDeviceRequest(WGPURequestDeviceStatus status, WGPUDevice dev, WGPU
 
     pipeline = wgpuDeviceCreateRenderPipeline(device, &pipeDesc);
 
+    // Pop error scope after pipeline creation
+    EM_ASM({
+        if (Module && Module['device']) {
+            Module['device'].popErrorScope().then((error) => {
+                if (error) {
+                    console.error('🚨 Pipeline Creation Error:', error.message);
+                } else {
+                    console.log('✅ Pipeline creation had no validation errors');
+                }
+            });
+        }
+    }, device);
+
     /* Vertex buffer */
-    float vertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
+    float vertices[] = {
+        -0.8f, -0.8f, 0.0f,
+         0.8f, -0.8f, 0.0f,
+         0.0f,  0.8f, 0.0f
+    };
 
     WGPUBufferDescriptor vbDesc = {0};
     vbDesc.usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst;

@@ -3,6 +3,7 @@
     #include "rendering/renderer_webgpu_draw.h"
     extern CameraUBO cameraUBOData;
     extern WGPUBuffer cameraBuffer;
+    extern WGPUTextureFormat swapchainFormat;
     extern void sky_update();
 
     // These globals are defined in renderer_webgpu.c
@@ -12,6 +13,13 @@
     extern WGPURenderPipeline pipeline;
     extern WGPUBuffer        vertexBuffer;
     extern WGPUBindGroup     bindGroup;
+
+    static void onPopErrorScope(WGPUPopErrorScopeStatus status, WGPUErrorType type, WGPUStringView message, void* userdata1, void* userdata2)
+    {
+        if (type != WGPUErrorType_NoError && message.data) {
+            printf("🚨 WebGPU Error: %.*s\n", (int)message.length, message.data);
+        }
+    }
 
     void webgpu_draw(float dt)
     {
@@ -71,6 +79,7 @@
         passDesc.colorAttachments = &colorAttachment;
 
         update_sky_ubo_webgpu();
+
         sky_update();
         update_camera_ubo();
         lights_update(0.15f, 0.15f, 0.15f,      // ambient
@@ -80,6 +89,8 @@
                       camera.x, camera.y, camera.z);   // view pos
 
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
+        wgpuRenderPassEncoderSetViewport(pass, 0, 0, g_width, g_height, 0.0f, 1.0f);
+        wgpuRenderPassEncoderSetScissorRect(pass, 0, 0, g_width, g_height);
 
         wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, bindGroup, 0, NULL);
@@ -87,7 +98,6 @@
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
 
         sky_draw_webgpu(pass);
-
         draw_models_webgpu(pass);
 
         if (g_ui_ctx->cursor_captured) {
@@ -95,13 +105,18 @@
             ui_renderer_upload(ui_framebuffer, g_width, g_height);
             ui_renderer_draw(pass);
         }
-        printf("width: %d\n", g_width);
+        //printf("width: %d\n", g_width);
 
         wgpuRenderPassEncoderEnd(pass);
 
         WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
+        wgpuDevicePushErrorScope(device, WGPUErrorFilter_Validation);
         wgpuQueueSubmit(queue, 1, &cmd);
+        WGPUPopErrorScopeCallbackInfo popInfo = {0};
+        popInfo.mode = WGPUCallbackMode_AllowProcessEvents;
+        popInfo.callback = onPopErrorScope;
 
+        wgpuDevicePopErrorScope(device, popInfo);
         wgpuTextureViewRelease(backbuffer);
         wgpuTextureRelease(surfaceTexture.texture);
         wgpuCommandBufferRelease(cmd);

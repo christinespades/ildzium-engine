@@ -83,7 +83,6 @@ void camera_get_projection_matrix(float* out_proj, float aspect_ratio)
 void update_camera(float deltaTime)
 {
     if (g_ui_ctx->cursor_captured) return;
-    camera.x += 1.0f * deltaTime;
 
     float velocity = camera.speed * deltaTime;
     float yawRad = camera.yaw * (PI / 180.0f);
@@ -124,8 +123,7 @@ void update_camera_ubo(void)
     camera_get_view_matrix(view);
 #ifdef __EMSCRIPTEN__
     float aspect = (float)g_width / (float)g_height;
-    printf("Camera UBO update - pos: (%.2f, %.2f, %.2f)  yaw: %.1f  pitch: %.1f  aspect: %.3f\n", 
-               camera.x, camera.y, camera.z, camera.yaw, camera.pitch, aspect);
+    //printf("Camera UBO update - pos: (%.2f, %.2f, %.2f)  yaw: %.1f  pitch: %.1f  aspect: %.3f\n", camera.x, camera.y, camera.z, camera.yaw, camera.pitch, aspect);
 #else
     float aspect = (float)swapchainExtent.width / (float)swapchainExtent.height;
 #endif

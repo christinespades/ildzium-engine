@@ -100,11 +100,65 @@ void draw_text(uint32_t* fb, int fb_w, int fb_h,
     }
 }
 
+void draw_text_clipped(uint32_t* fb, int fb_w, int fb_h,
+                       int x, int y, const char* text,
+                       uint32_t normal_color, int scale,
+                       int clip_l, int clip_r, int clip_t, int clip_b,
+                       UI_Button* b)
+{
+    if (!text || y >= clip_b || x >= clip_r) return;
+
+    bool has_selection = (b && b->is_editable && b->selection_start != -1);
+    int sel_start = has_selection ? (b->selection_start < b->selection_end ? b->selection_start : b->selection_end) : -1;
+    int sel_end   = has_selection ? (b->selection_start > b->selection_end ? b->selection_start : b->selection_end) : -1;
+
+    int cursor_x = x;
+    int cursor_y = y;
+    int char_w = FONT_WIDTH * scale;
+    int char_h = FONT_HEIGHT * scale;
+    int global_char_idx = 0;
+
+    while (*text)
+    {
+        if (*text == '\n')
+        {
+            cursor_y += FONT_HEIGHT * scale;
+            cursor_x = x;
+            text++;
+            global_char_idx++;
+            continue;
+        }
+
+        uint32_t draw_color = normal_color;
+        if (has_selection && global_char_idx >= sel_start && global_char_idx < sel_end)
+            draw_color = COLOR_SELECTED_TEXT;
+
+        // Proper clipping test
+        if (cursor_x + char_w > clip_l && cursor_x < clip_r &&
+            cursor_y + char_h > clip_t && cursor_y < clip_b)
+        {
+            draw_char(fb, fb_w, fb_h, *text, cursor_x, cursor_y, draw_color, scale);
+        }
+
+        cursor_x += char_w;
+        if (cursor_x >= clip_r) break;   // no point continuing this line
+
+        text++;
+        global_char_idx++;
+    }
+}
+
 void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
                          int x, int y, const char* text,
-                         uint32_t color, int base_scale, int line_height, UI_Button* b)
+                         uint32_t color, int base_scale, int line_height,
+                         UI_Button* b)
 {
-    if (!text || !*text) return;
+    if (!text || !*text || !b) return;
+
+    int clip_left   = b->x + 4;           // small padding
+    int clip_right  = b->x + b->w - 4;
+    int clip_top    = b->y + 4;
+    int clip_bottom = b->y + b->h - 4;
 
     char line[512];
     const char* p = text;
@@ -113,14 +167,20 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
 
     while (*p)
     {
-        // Early exit if this line is completely below the framebuffer
-        if (current_y >= fb_h) break;
+        if (current_y >= clip_bottom) break;           // completely below
+
+        // Early skip if line is completely above
+        if (current_y + char_h <= clip_top)
+        {
+            while (*p && *p != '\n') p++;
+            if (*p == '\n') p++;
+            current_y += line_height;
+            continue;
+        }
 
         int i = 0;
         while (*p && *p != '\n' && i < 510)
-        {
             line[i++] = *p++;
-        }
         line[i] = '\0';
 
         if (i > 0)
@@ -129,7 +189,6 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
             int offset_x = 0;
             const char* lines_to_draw = line;
 
-            // Header control character support
             if (line[0] >= 0x02 && line[0] <= 0x07)
             {
                 int level = line[0] - 0x01;
@@ -138,16 +197,10 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
                 offset_x = 4;
             }
 
-            // Only draw if the line is at least partially visible
-            if (current_y + char_h > 0)
-            {
-                draw_text(fb, fb_w, fb_h,
-                          lines_to_draw,
-                          x + offset_x,
-                          current_y,
-                          color,
-                          draw_scale, b);
-            }
+            draw_text_clipped(fb, fb_w, fb_h,
+                              x + offset_x, current_y,
+                              lines_to_draw, color, draw_scale,
+                              clip_left, clip_right, clip_top, clip_bottom, b);
         }
 
         current_y += line_height;

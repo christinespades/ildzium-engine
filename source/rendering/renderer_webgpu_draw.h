@@ -8,3 +8,4 @@
 #include "ui/ui_draw.h"
 
 void webgpu_draw(float dt);
+void webgpu_test_render();

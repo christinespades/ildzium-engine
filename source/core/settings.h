@@ -1,4 +1,5 @@
 #pragma once
+// All settings are project-specific
 
 typedef enum {
     CAMERA_NONE          = 0,
@@ -17,12 +18,18 @@ typedef enum {
     RENDERER_SHOW_FPS  = 1 << 0,
     RENDERER_SHOW_DRAWN    = 1 << 1,
     RENDERER_SHOW_CULLED   = 1 << 2,
+    RENDERER_DRAW_SKYBOX  = 1 << 3,
+    RENDERER_DRAW_MESHES  = 1 << 4,
+    RENDERER_DRAW_LIGHTS  = 1 << 5,
 } RendererFlags;
 
 static uint32_t g_renderer_flags =
     RENDERER_SHOW_FPS |
     RENDERER_SHOW_DRAWN |
-    RENDERER_SHOW_CULLED;
+    RENDERER_SHOW_CULLED |
+    RENDERER_DRAW_SKYBOX |
+    RENDERER_DRAW_MESHES |
+    RENDERER_DRAW_LIGHTS;
 extern float g_fps;
 extern uint32_t g_drawn_count;
 extern uint32_t g_culled_count;
