@@ -7,8 +7,10 @@ int g_line_height; // used for editable text
 void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text,
                    UI_ButtonCallback on_click,
                    UI_ButtonCallback on_held,
-                   UI_ButtonCallback on_release) {
-    if (ctx->button_count >= MAX_BUTTONS) return;
+                   UI_ButtonCallback on_release,
+                   UI_ButtonCallback on_hover,
+                   const char* tooltip_text) {
+    if (ctx->button_count >= get_param_float(PARAM_UI_MAX_BUTTONS)) return;
 
     UI_Button* b = &ctx->buttons[ctx->button_count];
     b->x = x; b->y = y; b->w = w; b->h = h;
@@ -18,6 +20,8 @@ void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text
     b->on_click = on_click;
     b->on_held = on_held;
     b->on_release = on_release;
+    b->on_hover = on_hover;
+    b->tooltip = tooltip_text;
     b->is_scrollable = false; // regular buttons don't have scroll
 
     // Default: no tuning
@@ -32,7 +36,7 @@ void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text
 // for read-only text containers
 void ui_add_scrollable_text(UI_Context* ctx, int x, int y, int w, int h, const char* text)
 {
-	if (ctx->button_count >= MAX_BUTTONS) return;
+	if (ctx->button_count >= get_param_float(PARAM_UI_MAX_BUTTONS)) return;
 	UI_Button* b = &ctx->buttons[ctx->button_count];
 	b->x = x; b->y = y; b->w = w; b->h = h;
 	b->content = text; // read-only
@@ -52,7 +56,7 @@ void ui_add_scrollable_text(UI_Context* ctx, int x, int y, int w, int h, const c
 // for text fields/editables
 void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, const char* initial_text, const char* filepath)
 {
-    if (ctx->button_count >= MAX_BUTTONS) return;
+    if (ctx->button_count >= get_param_float(PARAM_UI_MAX_BUTTONS)) return;
     UI_Button* b = &ctx->buttons[ctx->button_count];
 
     b->x = x; b->y = y; b->w = w; b->h = h;
@@ -77,35 +81,7 @@ void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, 
 	else
 	    b->editable_content[0] = '\0';
 	
-    b->filepath = platform_strdup(filepath);
-    init_editor_undo(b, EDITOR_UNDO_HISTORY_AMOUNT); // need to call this for undo system, and free it when we destroy text editor button
-    ctx->button_count++;
-}
-
-// for slider-like buttons
-void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
-                  const char* text,
-                  float* target,
-                  float min_val,
-                  float max_val)
-{
-    if (ctx->button_count >= MAX_BUTTONS) return;
-
-    UI_Button* b = &ctx->buttons[ctx->button_count];
-    
-    b->x = x; b->y = y; b->w = w; b->h = h;
-    b->content = text; // read-only
-    b->editable_content = NULL;
-    b->is_editable = false;
-    b->on_click = NULL;
-    b->on_held = NULL;
-    b->on_release = NULL;
-    b->is_scrollable = false; // tuner buttons don't have scroll 
-    b->target_value = target;
-    b->min_value = min_val;
-    b->max_value = max_val;
-    // auto-compute (recommended)
-    b->step_size = 0.0f;   // mark as "auto"
-    
+    b->filepath = ildz_strdup(filepath);
+    init_editor_undo(b, get_param_float(PARAM_UI_EDITOR_UNDO_HISTORY_AMOUNT)); // need to call this for undo system, and free it when we destroy text editor button
     ctx->button_count++;
 }

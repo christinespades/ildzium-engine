@@ -62,15 +62,15 @@ void draw_text(uint32_t* fb, int fb_w, int fb_h,
 
     int cursor_x = x;
     int cursor_y = y;
-    int char_w = FONT_WIDTH * scale;
-    int char_h = FONT_HEIGHT * scale;
+    int char_w = get_param_float(PARAM_UI_FONT_WIDTH) * scale;
+    int char_h = get_param_float(PARAM_UI_FONT_HEIGHT) * scale;
     int global_char_idx = 0;
 
     while (*text)
     {
         if (*text == '\n')
         {
-            cursor_y += FONT_HEIGHT * scale;
+            cursor_y += get_param_float(PARAM_UI_FONT_HEIGHT) * scale;
             cursor_x = x;
             text++;
             global_char_idx++;
@@ -83,7 +83,7 @@ void draw_text(uint32_t* fb, int fb_w, int fb_h,
         // Selected text = white
         if (has_selection && global_char_idx >= sel_start && global_char_idx < sel_end)
         {
-            draw_color = COLOR_SELECTED_TEXT;
+            draw_color = get_param_color(PARAM_UI_COLOR_SELECTED_TEXT);
         }
 
         if (cursor_x + char_w > 0 && cursor_y + char_h > 0 &&
@@ -114,15 +114,15 @@ void draw_text_clipped(uint32_t* fb, int fb_w, int fb_h,
 
     int cursor_x = x;
     int cursor_y = y;
-    int char_w = FONT_WIDTH * scale;
-    int char_h = FONT_HEIGHT * scale;
+    int char_w = get_param_float(PARAM_UI_FONT_WIDTH) * scale;
+    int char_h = get_param_float(PARAM_UI_FONT_HEIGHT) * scale;
     int global_char_idx = 0;
 
     while (*text)
     {
         if (*text == '\n')
         {
-            cursor_y += FONT_HEIGHT * scale;
+            cursor_y += get_param_float(PARAM_UI_FONT_HEIGHT) * scale;
             cursor_x = x;
             text++;
             global_char_idx++;
@@ -131,7 +131,7 @@ void draw_text_clipped(uint32_t* fb, int fb_w, int fb_h,
 
         uint32_t draw_color = normal_color;
         if (has_selection && global_char_idx >= sel_start && global_char_idx < sel_end)
-            draw_color = COLOR_SELECTED_TEXT;
+            draw_color = get_param_color(PARAM_UI_COLOR_SELECTED_TEXT);
 
         // Proper clipping test
         if (cursor_x + char_w > clip_l && cursor_x < clip_r &&
@@ -163,19 +163,18 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
     char line[512];
     const char* p = text;
     int current_y = y;
-    int char_h = FONT_HEIGHT * base_scale;
+    int char_h = get_param_float(PARAM_UI_FONT_HEIGHT) * base_scale;
+    
+    // Approximate char width if you don't have a dedicated function:
+    int approx_char_w = 8 * base_scale; 
+    float max_calculated_width = 0.0f;
 
     while (*p)
     {
-        if (current_y >= clip_bottom) break;           // completely below
-
-        // Early skip if line is completely above
-        if (current_y + char_h <= clip_top)
-        {
-            while (*p && *p != '\n') p++;
-            if (*p == '\n') p++;
-            current_y += line_height;
-            continue;
+        if (current_y >= clip_bottom) {
+            // Even if we stop drawing vertically, if width isn't calculated, 
+            // we must keep scanning the text to know the true max width.
+            if (b->content_width > 0.0f) break; 
         }
 
         int i = 0;
@@ -183,7 +182,24 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
             line[i++] = *p++;
         line[i] = '\0';
 
-        if (i > 0)
+        // --- Calculate Line Width ---
+        if (b->content_width <= 0.0f) {
+            float line_w = (float)(i * approx_char_w); 
+            if (line_w > max_calculated_width) {
+                max_calculated_width = line_w;
+            }
+        }
+
+        // Early skip if line is completely above visual frame
+        if (current_y + char_h <= clip_top)
+        {
+            current_y += line_height;
+            if (*p == '\n') p++;
+            continue;
+        }
+
+        // Only draw if it's within vertical boundaries
+        if (i > 0 && current_y < clip_bottom)
         {
             int draw_scale = base_scale;
             int offset_x = 0;
@@ -197,6 +213,7 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
                 offset_x = 4;
             }
 
+            // Note: x already includes (-b->scroll_offset_x) from the caller loop!
             draw_text_clipped(fb, fb_w, fb_h,
                               x + offset_x, current_y,
                               lines_to_draw, color, draw_scale,
@@ -205,5 +222,10 @@ void draw_multiline_text(uint32_t* fb, int fb_w, int fb_h,
 
         current_y += line_height;
         if (*p == '\n') p++;
+    }
+
+    // Cache the max width if it hasn't been set yet
+    if (b->content_width <= 0.0f) {
+        b->content_width = max_calculated_width;
     }
 }

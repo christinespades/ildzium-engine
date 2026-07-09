@@ -6,5 +6,5 @@ typedef struct {
 } LoadState;
 
 #ifndef __EMSCRIPTEN__
-	char* fetch_readme(const char* url);
+	char* fetch_readme(const char* url, const char* old_etag, char** new_etag, long* out_status);
 #endif

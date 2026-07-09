@@ -10,7 +10,7 @@ int get_text_width(const char* text, int scale)
     if (!text) return 0;
     int len = 0;
     while (text[len]) len++;
-    return len * FONT_WIDTH * scale;
+    return len * get_param_float(PARAM_UI_FONT_WIDTH) * scale;
 }
 
 // ====================== HORIZONTAL SCROLLING TEXT ======================
@@ -25,7 +25,7 @@ void draw_text_hscroll(uint32_t* fb, int fb_width, int fb_height,
 
     const char* sep = " ||| ";
 
-    int char_w = FONT_WIDTH * scale;
+    int char_w = get_param_float(PARAM_UI_FONT_WIDTH) * scale;
     int text_len = strlen(text);
     int sep_len  = strlen(sep);
 
@@ -89,7 +89,8 @@ void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
             remaining -= written; \
             first = false; \
         } while(0)
-
+    if (g_project_flags & PROJECT_SHOW_NAME)
+        APPEND("Project: %s", g_current_project_name);
     if (g_renderer_flags & RENDERER_SHOW_FPS)
         APPEND("FPS: %.1f", g_fps);
 
@@ -120,19 +121,19 @@ void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
 
     ui_draw_panel(fb, fb_width, fb_height,
                   0, panel_y, fb_width, panel_height,
-                  COLOR_BOTTOM_INFO_PANEL_BG, COLOR_BOTTOM_INFO_PANEL_BORDER);
+                  get_param_color(PARAM_UI_COLOR_BOTTOM_INFO_PANEL_BG), get_param_color(PARAM_UI_COLOR_BOTTOM_INFO_PANEL_BORDER));
 
     // === Horizontal scrolling text ===
-    int text_y = panel_y + (panel_height - FONT_HEIGHT) / 2;
+    int text_y = panel_y + (panel_height - get_param_float(PARAM_UI_FONT_HEIGHT)) / 2;
     int available_width = fb_width - 2 * padding;
 
-    info_scroll_x += BOTTOM_INFO_PANEL_AUTOSCROLL_SPEED * dt;
+    info_scroll_x += get_param_float(PARAM_UI_BOTTOM_INFO_PANEL_AUTOSCROLL_SPEED) * dt;
 
     // Draw
     draw_text_hscroll(fb, fb_width, fb_height,
                       info_text,
                       padding, text_y,
-                      COLOR_BOTTOM_INFO_PANEL_TEXT, 1,
+                      get_param_color(PARAM_UI_COLOR_BOTTOM_INFO_PANEL_TEXT), 1,
                       (int)info_scroll_x,
                       available_width);
 }

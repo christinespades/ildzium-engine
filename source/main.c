@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "main.h"
 #include "rendering/renderer_webgpu_draw.h"
+#include "ui/ui_params.h"
 static int g_target_fps = 60;
 double lastTime;
 double last_render_time;
@@ -26,6 +27,7 @@ void init()
     #endif
 
     init_input();
+    init_macro_param_registry();
     g_ui_ctx = malloc(sizeof(UI_Context));
     ui_init(g_ui_ctx);
     init_camera();
@@ -89,13 +91,12 @@ int main()
     }
 
     watcher_cleanup();
-#endif
 
-    ui_cleanup(g_ui_ctx);
-    free(g_ui_ctx);
-    
-#ifndef __EMSCRIPTEN__
-    vulkan_glfw_shutdown();
+    if (g_window) {
+        glfwDestroyWindow(g_window);
+        g_window = NULL;
+    }
+    glfwTerminate();
 #endif
     return 0;
 }

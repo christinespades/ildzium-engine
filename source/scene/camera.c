@@ -121,12 +121,8 @@ void update_camera_ubo(void)
     float view[16], proj[16], invView[16];
 
     camera_get_view_matrix(view);
-#ifdef __EMSCRIPTEN__
     float aspect = (float)g_width / (float)g_height;
-    //printf("Camera UBO update - pos: (%.2f, %.2f, %.2f)  yaw: %.1f  pitch: %.1f  aspect: %.3f\n", camera.x, camera.y, camera.z, camera.yaw, camera.pitch, aspect);
-#else
-    float aspect = (float)swapchainExtent.width / (float)swapchainExtent.height;
-#endif
+    // printf("Camera UBO update - pos: (%.2f, %.2f, %.2f)  yaw: %.1f  pitch: %.1f  aspect: %.3f\n", camera.x, camera.y, camera.z, camera.yaw, camera.pitch, aspect);
     camera_get_projection_matrix(proj, aspect);
 
 #ifdef __EMSCRIPTEN__

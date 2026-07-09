@@ -22,25 +22,70 @@ char* load_file(const char* path)
     return buf;
 }
 
-char* save_file(const char* path, const char* data)
+void save_file(const char *path, const char *data)
 {
-    if (!data) return NULL;  // nothing to write
+    if (!path || path[0] == '\0') {
+        fprintf(stderr, "Error: Invalid file path.\n");
+        return;
+    }
 
-    FILE* f = fopen(path, "wb");
+    if (!data) {
+        fprintf(stderr, "Error: File data is NULL.\n");
+        return;
+    }
+
+    // --- 1. Extract the Directory and Create It ---
+    // Make a mutable copy of the path to manipulate it safely
+    char *path_copy = strdup(path);
+    if (path_copy) {
+        // Find the last trailing slash (handles both Windows '\' and Unix '/')
+        char *last_slash = strrchr(path_copy, '/');
+        #ifdef _WIN32
+        char *last_backslash = strrchr(path_copy, '\\');
+        if (last_backslash > last_slash) {
+            last_slash = last_backslash;
+        }
+        #endif
+
+        if (last_slash != NULL) {
+            *last_slash = '\0'; // Temporarily truncate the string at the last slash to isolate the folder path
+            
+            // If the directory path isn't empty, create it
+            if (strlen(path_copy) > 0) {
+                if (!platform_create_directory(path_copy)) {
+                    fprintf(stderr, "Warning: Could not verify/create directory '%s'\n", path_copy);
+                    // We don't return here because the directory might already exist 
+                    // via a complex edge-case, let fopen be the ultimate judge.
+                }
+            }
+        }
+        free(path_copy);
+    }
+
+    // --- 2. Proceed with File Writing ---
+    FILE *f = fopen(path, "wb");
     if (!f) {
-        const char* err_msg = "// Failed to save file\n";
-        char* buf = (char*)malloc(strlen(err_msg) + 1);
-        strcpy(buf, err_msg);
-        return buf;
+        fprintf(stderr, "Failed to open '%s': ", path);
+        perror(NULL);
+        return;
     }
 
     size_t len = strlen(data);
-    fwrite(data, 1, len, f);
-    fclose(f);
+    size_t written = fwrite(data, 1, len, f);
 
-    // Return a simple success message, optional
-    const char* success_msg = "// File saved successfully\n";
-    char* buf = (char*)malloc(strlen(success_msg) + 1);
-    strcpy(buf, success_msg);
-    return buf;
+    if (written != len) {
+        fprintf(stderr,
+                "Failed to write file '%s' (%zu of %zu bytes written).\n",
+                path, written, len);
+        fclose(f);
+        return;
+    }
+
+    if (fclose(f) != 0) {
+        fprintf(stderr, "Failed to close '%s': ", path);
+        perror(NULL);
+        return;
+    }
+
+    printf("Saved %zu bytes to '%s'\n", len, path);
 }

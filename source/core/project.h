@@ -2,8 +2,8 @@
 #include "core/platform.h"
 
 #define MAX_PROJECT_NAME 128
-#define PROJECTS_DIR "projects"   // relative to executable or use full path via platform layer
-
+#define PROJECTS_DIR "C:\\Users\\Public\\Downloads\\000github\\ildzium-engine\\projects"
+extern char g_current_project_name[MAX_PROJECT_NAME];
 extern bool g_is_rename_mode;
 extern bool g_show_project_modal;
 extern char g_modal_old_name[MAX_PROJECT_NAME];

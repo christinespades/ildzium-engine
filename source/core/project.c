@@ -1,16 +1,34 @@
 #include "pch.h"
 #include "project.h"
 
-static char current_project[MAX_PROJECT_NAME] = "Default";
+#define DEFAULT_PROJECT_NAME "Ildrathia (3D Template)"
+char g_current_project_name[MAX_PROJECT_NAME] = DEFAULT_PROJECT_NAME;
 static char current_project_path[512] = "";
 
-static Project* g_projects = NULL;
+// Change this to a pointer so it can be reallocated and freed
+static Project* g_projects = NULL; 
 static int g_project_count = 0;
+
 bool g_show_project_modal = false;
 bool g_is_rename_mode = false;
 char g_modal_old_name[MAX_PROJECT_NAME] = "";
 
-// Add these two functions if not already there
+// Helper function to insert hardcoded templates before scanning the disk
+static void add_template_project(const char* name, const char* path)
+{
+    g_projects = realloc(g_projects, (g_project_count + 1) * sizeof(Project));
+    Project* p = &g_projects[g_project_count];
+    
+    strncpy(p->name, name, MAX_PROJECT_NAME - 1);
+    p->name[MAX_PROJECT_NAME - 1] = '\0';
+    
+    strncpy(p->folder_path, path, sizeof(p->folder_path) - 1);
+    p->folder_path[sizeof(p->folder_path) - 1] = '\0';
+    
+    p->last_modified = 0;
+    g_project_count++;
+}
+
 void project_show_new_dialog(void)
 {
     g_show_project_modal = true;
@@ -29,9 +47,12 @@ void project_show_rename_dialog(const char* current_name)
 
 static void ensure_default_project(void)
 {
-    if (!project_exists("Default"))
+    if (!project_exists(DEFAULT_PROJECT_NAME))
     {
-        //platform_create_directory("projects/Default");
+        char default_path[512];
+        snprintf(default_path, sizeof(default_path), "%s/%s", PROJECTS_DIR, DEFAULT_PROJECT_NAME);
+
+        platform_create_directory(default_path);
         // TODO: create default scene file, config, etc.
         printf("Created Default project");
     }
@@ -39,10 +60,18 @@ static void ensure_default_project(void)
 
 void project_init(void)
 {
-    //platform_create_directory(PROJECTS_DIR);
+    platform_create_directory(PROJECTS_DIR);
     ensure_default_project();
+
+    // 1. Seed your hardcoded template projects into the dynamic array
+    add_template_project(DEFAULT_PROJECT_NAME, "./projects/ildrathia");
+    add_template_project("(2D Sprite Template)", "./projects/ildz");
+    add_template_project("(2D Pure Shader Template)", "./projects/desktop_boilerplate");
+
+    // 2. Scan the directory to append any other projects found on disk
     project_refresh_list();
-    project_load("Default");   // always start with Default
+    
+    project_load(DEFAULT_PROJECT_NAME); // always start with Default
 }
 
 void project_shutdown(void)
@@ -104,7 +133,7 @@ bool project_load(const char* name)
     if (!project_exists(name))
         return false;
 
-    strncpy(current_project, name, MAX_PROJECT_NAME - 1);
+    strncpy(g_current_project_name, name, MAX_PROJECT_NAME - 1);
     snprintf(current_project_path, sizeof(current_project_path), 
              "%s/%s", PROJECTS_DIR, name);
 
@@ -124,7 +153,7 @@ bool project_rename(const char* old_name, const char* new_name)
 
     if (platform_rename(old_path, new_path))
     {
-        if (strcmp(current_project, old_name) == 0)
+        if (strcmp(g_current_project_name, old_name) == 0)
             project_load(new_name);
 
         project_refresh_list();
@@ -135,15 +164,15 @@ bool project_rename(const char* old_name, const char* new_name)
 
 bool project_delete(const char* name)
 {
-    if (strcmp(name, "Default") == 0) return false; // protect default
+    if (strcmp(name, DEFAULT_PROJECT_NAME) == 0) return false; // protect default
 
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", PROJECTS_DIR, name);
 
     if (platform_delete_directory(path))
     {
-        if (strcmp(current_project, name) == 0)
-            project_load("Default");
+        if (strcmp(g_current_project_name, name) == 0)
+            project_load(DEFAULT_PROJECT_NAME);
 
         project_refresh_list();
         return true;
@@ -158,7 +187,7 @@ bool project_exists(const char* name)
     return platform_directory_exists(path);
 }
 
-const char* project_get_current_name(void) { return current_project; }
+const char* project_get_current_name(void) { return g_current_project_name; }
 const char* project_get_current_path(void) { return current_project_path; }
 
 Project* project_get_list(int* out_count)

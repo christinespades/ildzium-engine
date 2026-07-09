@@ -13,6 +13,6 @@ int  platform_get_mouse_button(int button);
 	void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 #else
     extern int g_mouse_buttons[3];
+#endif
     extern double g_mouse_x;
     extern double g_mouse_y;
-#endif

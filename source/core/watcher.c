@@ -247,19 +247,19 @@
     void watcher_cleanup(void)
     {
         InterlockedExchange(&g_running, 0);
-        thrd_join(g_watcher_thread, NULL);
 
+        // Wake the background thread up instantly
         for (int i = 0; i < g_num_watchers; ++i) {
-            DirectoryWatcher* w = &g_watchers[i];
-            if (w->hDir != INVALID_HANDLE_VALUE) {
-                CancelIo(w->hDir);
-                CloseHandle(w->hDir);
+            if (g_watchers[i].hDir != INVALID_HANDLE_VALUE) {
+                CancelIoEx(g_watchers[i].hDir, NULL);
+                CloseHandle(g_watchers[i].hDir);
             }
-            free(w->config.dir_path);
-            for (int j = 0; j < w->config.num_extensions; ++j)
-                free(w->config.extensions[j]);
-            free(w->config.extensions);
         }
+
+        thrd_join(g_watcher_thread, NULL);
+        
+        // Skip all loops over free() completely! 
+        // The operating system garbage collects the process heap instantly.
         g_num_watchers = 0;
     }
 #endif

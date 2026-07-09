@@ -1,4 +1,5 @@
 #pragma once
+#include "core/http_cache.h"
 #include "core/http_fetch.h"
 
 #ifdef __EMSCRIPTEN__

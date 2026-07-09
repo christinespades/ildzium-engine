@@ -143,7 +143,7 @@ uint64_t platform_get_file_time(const char* path) {
     return 0;
 }
 
-char* platform_strdup(const char* str)
+char* ildz_strdup(const char* str)
 {
     if (!str) return NULL;
     size_t len = strlen(str) + 1;

@@ -7,21 +7,19 @@
 #include "ui/ui_callbacks.h"
 #include "ui/ui_params.h"
 #include "ui/ui_editor.h"
+#include "ui/ui_tuner.h"
 #include "ui/modes/ui_project.h"
 
 typedef void (*UI_ButtonCallback)(void);
 void ui_add_button(UI_Context* ctx, int x, int y, int w, int h, const char* text,
                    UI_ButtonCallback on_click,
                    UI_ButtonCallback on_held,
-                   UI_ButtonCallback on_release);
+                   UI_ButtonCallback on_release,
+                   UI_ButtonCallback on_hover,
+                   const char* tooltip_text);
 
 void ui_add_scrollable_text(UI_Context* ctx, int x, int y, int w, int h, const char* text);
 void ui_add_scrollable_text_editor(UI_Context* ctx, int x, int y, int w, int h, const char* initial_text, const char* filepath);
-void ui_add_tuner(UI_Context* ctx, float x, float y, float w, float h,
-                  const char* text,
-                  float* target,
-                  float min_val,
-                  float max_val);
 
 extern bool g_show_project_modal;
 extern bool g_is_rename_mode;

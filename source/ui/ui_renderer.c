@@ -383,7 +383,10 @@ uint32_t* ui_framebuffer = NULL;
         vkDestroyBuffer(vk_device, stagingBuffer, NULL);
         vkFreeMemory(vk_device, stagingMemory, NULL);
     #else
-        if (!ui_pixels) return;
+        if (!ui_pixels) {
+            printf("No UI pixels\n");
+            return;
+        }
 
         // Recreate texture if size changed
         if (width != currentUiWidth || height != currentUiHeight) {
@@ -395,7 +398,6 @@ uint32_t* ui_framebuffer = NULL;
             // For now, call ui_renderer_init() again is acceptable for UI
             ui_renderer_init();   // simple but works
         }
-        // 1. In your version, it's called WGPUTexelCopyTextureInfo
         WGPUTexelCopyTextureInfo dst = {
             .texture = uiTexture,
             .mipLevel = 0,
@@ -403,14 +405,12 @@ uint32_t* ui_framebuffer = NULL;
             .aspect = WGPUTextureAspect_All
         };
 
-        // 2. In your version, it's called WGPUTexelCopyBufferLayout
         WGPUTexelCopyBufferLayout layout = {
             .offset = 0,
             .bytesPerRow = width * 4,
             .rowsPerImage = height
         };
 
-        // 3. In modern WebGPU, this field is depthOrArrayLayers
         WGPUExtent3D size = { 
             .width = width, 
             .height = height, 
@@ -693,6 +693,11 @@ uint32_t* ui_framebuffer = NULL;
         .targets = &colorTarget
     };
 
+    WGPUDepthStencilState depthStencil = {0};
+    depthStencil.format = WGPUTextureFormat_Depth24Plus;
+    depthStencil.depthWriteEnabled = true;
+    depthStencil.depthCompare = WGPUCompareFunction_Less;
+
     WGPURenderPipelineDescriptor desc = {0};
     desc.layout = pipelineLayout;
 
@@ -704,6 +709,7 @@ uint32_t* ui_framebuffer = NULL;
     desc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
     //desc.primitive.cullMode = WGPUCullMode_None;
     desc.multisample.count = 1;
+    desc.depthStencil = &depthStencil;
     desc.label = (WGPUStringView){ .data = "UIPipeline", .length = 10 };
 
     uiPipeline = wgpuDeviceCreateRenderPipeline(device, &desc);

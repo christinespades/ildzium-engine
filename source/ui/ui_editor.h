@@ -13,3 +13,5 @@ void move_to_end(UI_Button* b);
 int get_text_length(UI_Button* b);
 int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y);
 void select_word_at_position(UI_Button* b, int click_pos);
+void select_all_text(UI_Button* b);
+void cut_selection_to_clipboard(UI_Button* b);

@@ -6,42 +6,25 @@ void on_button_held(void) {
     //printf("Button HELD!\n");
 }
 
-void on_camera_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_CAMERA);
+void on_button_hovered(void) {
 }
 
-void on_fx_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_FX);
-}
+void on_layout_box_clicked(void) {}
 
-void on_input_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_INPUT);
-}
+#define UI_MODE_LIST \
+    X(camera,  UI_MODE_CAMERA)  \
+    X(fx,      UI_MODE_FX)      \
+    X(input,   UI_MODE_INPUT)   \
+    X(lights,  UI_MODE_LIGHTS)  \
+    X(main,    UI_MODE_MAIN)    \
+    X(meshes,  UI_MODE_MESHES)  \
+    X(project, UI_MODE_PROJECT) \
+    X(skybox,  UI_MODE_SKYBOX)  \
+    X(sounds,  UI_MODE_SOUNDS)  \
+    X(terrain, UI_MODE_TERRAIN) \
+    X(ui,      UI_MODE_UI)
 
-void on_lights_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_LIGHTS);
-}
-
-void on_main_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_MAIN);
-}
-
-void on_meshes_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_MESHES);
-}
-
-void on_project_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_PROJECT);
-}
-
-void on_skybox_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_SKYBOX);
-}
-
-void on_sounds_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_SOUNDS);
-}
-
-void on_terrain_clicked(void) {
-    if (g_ui_ctx) ui_set_mode(g_ui_ctx, UI_MODE_TERRAIN);
-}
+#define X(name, mode) \
+    void on_##name##_clicked(void) { if (g_ui_ctx) ui_set_mode(g_ui_ctx, mode); }
+UI_MODE_LIST
+#undef X

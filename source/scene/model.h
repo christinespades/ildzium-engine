@@ -30,15 +30,29 @@
     typedef struct {
         float model[16];     // mat4 - 64 bytes
         float color[4];      // vec4 - 16 bytes
-    } InstanceData;
+    } InstanceData; // Perfectly matches old 80-byte shader alignment
+
+    typedef struct {
+        float model[16];
+        float color[4];
+        
+        // CPU-only bookkeeping data (Never sent to the GPU)
+        uint32_t model_index;   
+        float bounding_center[3]; 
+        float bounding_radius;  
+    } CPUInstanceData;
 
     // One unique loaded model (can have 1 mesh for now)
     typedef struct {
-        char* name;                    // e.g. "cs_goddess_statue"
-        Mesh  mesh;                    // ← changed: single Mesh for now (easier)
-        uint32_t instanceOffset;       // start index in the big instance buffer
-        uint32_t instanceCount;        // how many instances of THIS model
+        char* name;
+        Mesh  mesh;
+        uint32_t instanceOffset;
+        uint32_t instanceCount;
         bool isLoaded;
+        
+        // Cache the model geometry's intrinsic bounding bounds
+        float local_center[3];
+        float local_radius;
     } Model;
 
     typedef struct {
@@ -46,7 +60,7 @@
         uint32_t modelCount;
         uint32_t modelCapacity;
 
-        InstanceData* instances;       // still one big buffer for the GPU
+        CPUInstanceData* instances;       // still one big buffer for the GPU
         uint32_t instanceCapacity;
         uint32_t instanceCount;        // total live instances across ALL models
     #ifdef __EMSCRIPTEN__

@@ -296,8 +296,8 @@ ModelSystem g_model_system = {0};
         WGPUVertexState vertexState = {
             .module = modelVertexShader,
             .entryPoint = (WGPUStringView){.data = "main", .length = 4},
-            .bufferCount = 2,
-            .buffers = (WGPUVertexBufferLayout[]){ vertexBufferLayout, instanceBufferLayout }
+            .bufferCount = 1, // Only tracking vertexBufferLayout now
+            .buffers = (WGPUVertexBufferLayout[]){ vertexBufferLayout }
         };
 
         WGPUFragmentState fragmentState = {
@@ -305,22 +305,17 @@ ModelSystem g_model_system = {0};
             .entryPoint = (WGPUStringView){.data = "main", .length = 4},
             .targetCount = 1,
             .targets = &(WGPUColorTargetState){
-                .format = WGPUTextureFormat_BGRA8Unorm,   // change if your surface uses different format
+                .format = WGPUTextureFormat_BGRA8Unorm,
                 .blend = NULL,
                 .writeMask = WGPUColorWriteMask_All
             }
         };
 
         // Depth state
-        WGPUDepthStencilState depthStencil = {
-            .format = WGPUTextureFormat_Depth24PlusStencil8,   // or Depth32Float
-            .depthWriteEnabled = true,
-            .depthCompare = WGPUCompareFunction_LessEqual,
-            .stencilFront = { .compare = WGPUCompareFunction_Always },
-            .stencilBack  = { .compare = WGPUCompareFunction_Always },
-            .stencilReadMask = 0xFFFFFFFF,
-            .stencilWriteMask = 0xFFFFFFFF
-        };
+        WGPUDepthStencilState depthStencil = {0};
+        depthStencil.format = WGPUTextureFormat_Depth24Plus;
+        depthStencil.depthWriteEnabled = true;
+        depthStencil.depthCompare = WGPUCompareFunction_Less;
 
         WGPURenderPipelineDescriptor pipelineDesc = {
             .label = (WGPUStringView){.data = "ModelPipeline", .length = 13},
@@ -328,7 +323,7 @@ ModelSystem g_model_system = {0};
             .vertex = vertexState,
             .primitive = {
                 .topology = WGPUPrimitiveTopology_TriangleList,
-                .cullMode = WGPUCullMode_Back,
+                .cullMode = WGPUCullMode_None,
                 .frontFace = WGPUFrontFace_CCW
             },
             .depthStencil = &depthStencil,
@@ -401,14 +396,16 @@ ModelSystem g_model_system = {0};
         create_model_descriptors();
         create_model_pipeline();
     #endif
+
         g_model_system.models = NULL;
         g_model_system.modelCount = 0;
         g_model_system.modelCapacity = 0;
 
         g_model_system.instances = NULL;
         g_model_system.instanceCount = 0;
-        g_model_system.instanceCapacity = 256;           // reasonable starting size
-        g_model_system.instances = malloc(g_model_system.instanceCapacity * sizeof(InstanceData));
+        g_model_system.instanceCapacity = 256;
+        g_model_system.instances = malloc(g_model_system.instanceCapacity * sizeof(CPUInstanceData));
+
     #ifdef __EMSCRIPTEN__
         WGPUBufferDescriptor bufDesc = {
             .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
@@ -422,23 +419,30 @@ ModelSystem g_model_system = {0};
         g_model_system.instanceBufferSize = 0;
 
         create_instance_buffer(g_model_system.instanceCapacity);
+    #endif
 
-        // Add many instances
+        // --- This now runs on BOTH Desktop and Web ---
         for (int i = 0; i < 200; i++) {
-            float transform[16] = {0}; // fill with your TRS matrix
+            float transform[16] = {0};
             matrix_identity(transform);
-
-            // matrix_scale(transform, 0.0075f, 0.075f, 0.075f);
 
             transform[3]  = (float)(i % 5) * 14.0f - 28.0f;
             transform[7]  = 0.0f;
             transform[11] = (float)(i / 5) * 14.0f - 18.0f;
 
-            float color[4] = {0.2f + (i%5)*0.2f, 0.6f, 0.8f, 1.0f};
-            add_model_instance("../../meshes/cs_goddess_statue_opt.glb", transform, color);
+            float color[4] = {0.2f + (i % 5) * 0.2f, 0.6f, 0.8f, 1.0f};
+
+            // Use standard path layout for web, relative dot-walk for native desktop
+    #ifdef __EMSCRIPTEN__
+            add_model_instance("assets/meshes/cs_goddess_statue_opt.glb", transform, color);
+    #else
+            add_model_instance("../../assets/meshes/cs_goddess_statue_opt.glb", transform, color);
+    #endif
         }
 
         update_model_instances();
+
+    #ifndef __EMSCRIPTEN__
         update_model_descriptor();
     #endif
     }
@@ -467,6 +471,33 @@ ModelSystem g_model_system = {0};
         model->instanceOffset = 0;                // we'll improve this later
         model->instanceCount = 0;
 
+        // Calculate bounding sphere from vertex positions
+        float min_x = 1e6f, min_y = 1e6f, min_z = 1e6f;
+        float max_x = -1e6f, max_y = -1e6f, max_z = -1e6f;
+        for (uint32_t v = 0; v < mesh.vertexCount; v++) {
+            if (vertices[v].x < min_x) min_x = vertices[v].x;
+            if (vertices[v].y < min_y) min_y = vertices[v].y;
+            if (vertices[v].z < min_z) min_z = vertices[v].z;
+            if (vertices[v].x > max_x) max_x = vertices[v].x;
+            if (vertices[v].y > max_y) max_y = vertices[v].y;
+            if (vertices[v].z > max_z) max_z = vertices[v].z;
+        }
+        // Center is mid-point of bounding box
+        model->local_center[0] = (min_x + max_x) * 0.5f;
+        model->local_center[1] = (min_y + max_y) * 0.5f;
+        model->local_center[2] = (min_z + max_z) * 0.5f;
+
+        // Radius is maximum distance from center to any vertex
+        float max_r2 = 0.0f;
+        for (uint32_t v = 0; v < mesh.vertexCount; v++) {
+            float dx = vertices[v].x - model->local_center[0];
+            float dy = vertices[v].y - model->local_center[1];
+            float dz = vertices[v].z - model->local_center[2];
+            float dist2 = dx*dx + dy*dy + dz*dz;
+            if (dist2 > max_r2) max_r2 = dist2;
+        }
+        model->local_radius = sqrtf(max_r2);
+
         // Cleanup temporary CPU data
         free(vertices);
         free(indices);
@@ -480,9 +511,8 @@ ModelSystem g_model_system = {0};
     #endif
         return model;
     }
- 
-#ifdef __EMSCRIPTEN__
-    // Forward declaration so load_model_from_server knows it exists
+
+ #ifdef __EMSCRIPTEN__
     void on_load_success(emscripten_fetch_t *fetch);
 
     void load_model_from_server(const char* url, Model* model_ptr) {
@@ -507,25 +537,29 @@ ModelSystem g_model_system = {0};
             return;
         }
 
-        // 2. Locate Binary Data
+        // 2. Safely Locate Binary Data Chunk
         uint32_t jsonLen = *(uint32_t*)(buffer + 12);
-        uint32_t binOffset = 12 + 8 + jsonLen; 
-        uint8_t* binData = buffer + binOffset + 8; 
+        
+        // chunk0 starts at 12. Length is jsonLen. 
+        // chunk1 header starts exactly at 12 + 8 + jsonLen.
+        uint32_t binChunkHeaderOffset = 12 + 8 + jsonLen;
+        
+        // Skip the 8-byte BIN chunk header (4 bytes length + 4 bytes type) to get to raw data
+        uint8_t* binData = buffer + binChunkHeaderOffset + 8; 
 
-        // 3. Define the data counts 
-        // IMPORTANT: For a custom parser without a JSON engine, 
-        // these usually need to be hardcoded or passed via header.
-        // Assuming a standard single-mesh export:
-        uint32_t vertexCount = 24; // Change this to your actual count
-        uint32_t index_count = 36; // Change this to your actual count
+        // 3. Dynamic Structural Target Values
+        // For your optimized engine asset, extract these numbers from your asset build 
+        // pipelines, or check your desktop logger to see what values cgltf provides!
+        uint32_t vertexCount = 3824;  // <-- Replace with your actual asset counts!
+        uint32_t index_count = 11472; // <-- Replace with your actual asset counts!
 
         Mesh mesh = {0};
         mesh.vertexCount = vertexCount;
         mesh.indexCount = index_count;
 
-        // Use local pointers instead of mesh.vertexData if 'Mesh' doesn't have those fields
+        // Standard GLTF exporters tightly pack vertices first, then indices right behind them
         void* tempVertexData = binData; 
-        void* tempIndexData = binData + (vertexCount * sizeof(Vertex3D));
+        void* tempIndexData  = binData + (vertexCount * sizeof(Vertex3D));
 
         // 4. Create WebGPU GPU buffers
         {
@@ -541,18 +575,18 @@ ModelSystem g_model_system = {0};
         if (index_count > 0) {
             WGPUBufferDescriptor idesc = {
                 .usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst,
-                .size = index_count * sizeof(uint32_t),
+                .size = index_count * sizeof(uint32_t), // ensure match with index type (uint16/uint32)
                 .label = "Index Buffer"
             };
             mesh.indexBuffer = wgpuDeviceCreateBuffer(device, &idesc);
             wgpuQueueWriteBuffer(queue, mesh.indexBuffer, 0, tempIndexData, idesc.size);
         }
         
-        // 5. Update the engine's model record
+        // 5. Commit data structures to global registry
         model->mesh = mesh;
         model->isLoaded = true; 
         
-        printf("Successfully parsed WebGPU model: %s\n", model->name);
+        printf("Successfully parsed WebGPU model: %s (%d vertices)\n", model->name, vertexCount);
         emscripten_fetch_close(fetch);
     }
 

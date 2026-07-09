@@ -1,10 +1,20 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: === Configuration ===
+:: === Global Configuration ===
 set BUILD_DIR=..\builds\debug
+set WEB_BUILD_DIR=..\builds\web
 set OUT_EXE=ildzium.exe
+set PROD_OUT=C:\Users\Public\Downloads\000github\christineee.com\static\js
 
+:: Dependency paths (Shared between Native and Web)
+set THIRDPARTY_INCLUDE=..\thirdparty
+set GLFW_LIB=..\thirdparty\GLFW\glfw3dll.lib
+set GLFW_DLL=..\thirdparty\GLFW\glfw3.dll
+set CURL_LIB=..\thirdparty\curl\libcurl.lib
+set CURL_DLL=..\thirdparty\curl\libcurl-x64.dll
+
+:: === Argument Parsing ===
 set BUILD_WEB=0
 set LOG_FLAGS=
 for %%a in (%*) do (
@@ -12,23 +22,18 @@ for %%a in (%*) do (
     if /I "%%a"=="-LOG_SCOPE" set LOG_FLAGS=!LOG_FLAGS! /DLOG_SCOPE_ENABLED
     if /I "%%a"=="-LOG_MALLOC" set LOG_FLAGS=!LOG_FLAGS! /DLOG_MALLOC_ENABLED
 )
+
 if "%BUILD_WEB%"=="1" (
     goto BUILD_WEB
 ) else (
     goto BUILD_NATIVE
 )
+
 :BUILD_NATIVE
-:: Vulkan
+:: Vulkan Specifics
 set "VULKAN_INCLUDE=%VULKAN_SDK%\Include"
 set "VULKAN_LIB=%VULKAN_SDK%\Lib"
 set "GLSLC=%VULKAN_SDK%\Bin\glslc.exe"
-
-:: Dependency paths
-set THIRDPARTY_INCLUDE=..\thirdparty
-set GLFW_LIB=..\thirdparty\GLFW\glfw3dll.lib
-set GLFW_DLL=..\thirdparty\GLFW\glfw3.dll
-set CURL_LIB=..\thirdparty\curl\libcurl.lib
-set CURL_DLL=..\thirdparty\curl\libcurl-x64.dll
 
 :: Create build directory
 if not exist %BUILD_DIR% mkdir %BUILD_DIR%
@@ -89,7 +94,7 @@ cl %LOG_FLAGS% /std:c11 /D_CRT_SECURE_NO_WARNINGS /wd4005 /wd4047 /wd4100 /wd426
     /I"..\source" ^
     /I"%VULKAN_INCLUDE%" ^
     /I"%THIRDPARTY_INCLUDE%" ^
-    "%BUILD_DIR%\resource.res" ^
+    / "%BUILD_DIR%\resource.res" ^
     "%BUILD_DIR%\pch.obj" ^
     /Fe"%BUILD_DIR%\%OUT_EXE%" ^
     /Fo"%BUILD_DIR%\\" ^
@@ -139,7 +144,6 @@ if exist "%BUILD_DIR%\%OUT_EXE%" (
 goto END
 
 :BUILD_WEB
-set WEB_BUILD_DIR=..\builds\web
 if not exist %WEB_BUILD_DIR% mkdir %WEB_BUILD_DIR%
 
 set "SRC_FILES="
@@ -149,27 +153,38 @@ for /R ..\source %%f in (*.c) do (
     )
 )
 
-emcc %SRC_FILES% ^
-    -I"..\source" ^
-    -I"%THIRDPARTY_INCLUDE%" ^
-    -I"..\thirdparty" ^
-    -O2 ^
-    --use-port=emdawnwebgpu ^
-    -s FULL_ES3=1 ^
-    -s ALLOW_MEMORY_GROWTH=1 ^
-    -s ALLOW_TABLE_GROWTH=1 ^
-    -s RESERVED_FUNCTION_POINTERS=64 ^
-    -s WASM=1 ^
-    -s FETCH=1 ^
-    -s ASSERTIONS=1 ^
-    -s ENVIRONMENT=web ^
-    -s MODULARIZE=1 ^
-    -s EXPORT_ES6=0 ^
-    -s ASYNCIFY=1 ^
-    -s EXPORTED_FUNCTIONS="['_main','_on_http_result']" ^
-    -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
-    --js-library "..\source\platform\web\library_http.js" ^
-    --shell-file shell.html -o "%WEB_BUILD_DIR%\index.html"
+set COMMON_FLAGS=^
+ -I"..\source" ^
+ -I"%THIRDPARTY_INCLUDE%" ^
+ -I"..\thirdparty" ^
+ -O2 ^
+ --use-port=emdawnwebgpu ^
+ --preload-file ../assets@assets ^
+ -s ALLOW_MEMORY_GROWTH=1 ^
+ -s ALLOW_TABLE_GROWTH=1 ^
+ -s RESERVED_FUNCTION_POINTERS=64 ^
+ -s WASM=1 ^
+ -s FETCH=1 ^
+ -s ASSERTIONS=1 ^
+ -s ENVIRONMENT=web ^
+ -s MODULARIZE=1 ^
+ -s EXPORT_ES6=0 ^
+ -s ASYNCIFY=1 ^
+ -s EXPORTED_FUNCTIONS="['_main','_on_http_result']" ^
+ -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
+ --js-library "..\source\platform\web\library_http.js"
+
+:: Build development
+call emcc %SRC_FILES% ^
+ %COMMON_FLAGS% ^
+ --shell-file shell.html ^
+ -o "%WEB_BUILD_DIR%\index.html"
+
+:: Build production
+call emcc %SRC_FILES% ^
+ %COMMON_FLAGS% ^
+ --shell-file shell.html ^
+ -o "%PROD_OUT%\ildzium.js"
 
 xcopy /E /I /Y ..\assets %WEB_BUILD_DIR%\assets
 xcopy /Y ..\web\* %WEB_BUILD_DIR%\

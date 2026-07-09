@@ -11,6 +11,7 @@ typedef struct UI_Button {
     void (*on_click)(void);
     void (*on_held)(void);
     void (*on_release)(void);
+    void (*on_hover)(void);
 
     float* target_value;   // NULL = normal button, otherwise we increment this
     float  step_size;      // how much to add while held
@@ -26,7 +27,9 @@ typedef struct UI_Button {
     int selection_start;        // -1 = no selection
     int selection_end;
     float scroll_offset;        // vertical scroll (pixels)
+    float scroll_offset_x;      // horizontal scroll (pixels)
     float content_height;       // total height needed for text
+    float content_width;        // total width needed for text (longest line)
     int line_height;            // approx pixels per line (set during draw)
 
     int last_click_pos;
@@ -47,4 +50,6 @@ typedef struct UI_Button {
 
     // optional: limit memory usage
     int          max_undo_steps;   // e.g. 100 or 500
+    bool is_color;
+    const char* tooltip;
 } UI_Button;

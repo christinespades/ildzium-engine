@@ -9,9 +9,9 @@ const float MOUSE_SENSITIVITY = 0.08f;
 
 #ifdef __EMSCRIPTEN__
     int g_mouse_buttons[3] = {0};
-    double g_mouse_x = 0;
-    double g_mouse_y = 0;
 #endif
+double g_mouse_x = 0;
+double g_mouse_y = 0;
 
 void handle_mouse_movement(float xoffset, float yoffset) {
     if (g_ui_ctx->cursor_captured)
@@ -79,6 +79,8 @@ void platform_get_mouse_pos(double* x, double* y)
 #else
     void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     {
+        g_mouse_x = xpos;
+        g_mouse_y = ypos;
         if (firstMouse) {
             lastX = (float)xpos;
             lastY = (float)ypos;

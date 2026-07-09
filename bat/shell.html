@@ -1,49 +1,39 @@
 <!doctype html>
 <html>
 <head>
-<meta charset="utf-8">
-<style>
-html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-}
-#canvas {
-    width: 100vw;
-    height: 100vh;
-    display: block;
-}
-</style>
+    <meta charset="utf-8">
+    <title>Ildzium Engine</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: #0d0d0d;
+            height: 100%;
+            overflow: hidden;
+        }
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+    </style>
 </head>
-
 <body>
-<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 
-{{{ SCRIPT }}}
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
 
-<script>
-Module({
-    canvas: document.getElementById('canvas'),
-    print: (...args) => console.log(...args),
-    printErr: (...args) => console.error(...args)
-});
-</script>
+    {{{ SCRIPT }}}
 
-import { initWebGPU, webgpuRenderFrame } from './webgpu.js';
-
-Module.onRuntimeInitialized = async () => {
-    const success = await initWebGPU();
-    if (success) {
-        // Call your C init if needed
-        Module.ccall('webgpu_c_init', 'void', [], []);
-        
-        // Set main loop
-        emscripten_set_main_loop(() => {
-            webgpuRenderFrame();           // JS does the actual rendering
-            Module.ccall('game_update', 'void', ['number'], [1/60]); // your C logic
-        }, 0, true);
-    }
-};
+    <script>
+        // Initialize the modularized engine artifact
+        Module({
+            canvas: document.getElementById('canvas'),
+            print: (...args) => console.log(...args),
+            printErr: (...args) => console.error(...args)
+        }).then((instance) => {
+            console.log("🚀 Ildzium WebGPU Engine Runtime Initialized Successfully.");
+        });
+    </script>
 
 </body>
 </html>

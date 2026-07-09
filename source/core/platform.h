@@ -24,4 +24,4 @@ bool platform_delete_directory(const char* path);   // recursive delete recommen
 uint64_t platform_get_file_time(const char* path);  // returns timestamp, higher = newer
 
 // String
-char* platform_strdup(const char* str);
+char* ildz_strdup(const char* str);

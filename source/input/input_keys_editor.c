@@ -66,6 +66,12 @@ void handle_editor_key(platform_key key)
         else if (ctrl && key == KEY_C) {
             copy_selection_to_clipboard(b);
         }
+        else if (ctrl && key == KEY_X) {
+            cut_selection_to_clipboard(b);
+        }
+        else if (ctrl && key == KEY_A) {
+            select_all_text(b);
+        }
         else if (ctrl && key == KEY_V) {
             paste_from_clipboard(b);
         }

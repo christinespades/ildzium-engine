@@ -17,6 +17,8 @@
     extern VkDevice vk_device;
     extern VkInstance vk_instance;
     extern VkSurfaceKHR vk_surface;
+    extern int g_width;
+    extern int g_height;
 
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkExtent2D swapchainExtent;
@@ -170,6 +172,8 @@
             exit(1);
         }
         swapchainExtent = surfaceCaps.currentExtent;
+        g_width = swapchainExtent.width;
+        g_height = swapchainExtent.height;
 
         // Surface format
         uint32_t formatCount;

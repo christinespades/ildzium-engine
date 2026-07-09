@@ -20,13 +20,15 @@ static void on_readme_loaded(char* readme, void* user)
     wrap_text(processed, wrapped, sizeof(wrapped), max_chars);
 
     // TODO: replace with render_markdown from ui_markdown.c after refactoring there (UI system needs specific element types for clickable links inside a scrollable text container, etc. so a scrollable text container contains a bunch of glyph elements and clickable link elements)
-    ui_add_scrollable_text(ctx,
-                    UI_CONTAINER_PADDING,
-                    UI_CONTAINER_PADDING,
-                    w - UI_CONTAINER_PADDING * 2,
-                    h - UI_CONTAINER_PADDING * 2,
-                    wrapped);
-
+    float pad = get_param_float(PARAM_UI_CONTAINER_PADDING);
+    float x = get_param_float(PARAM_UI_ELEMENT_START_X);
+    float y = get_param_float(PARAM_UI_ELEMENT_START_Y);
+    ui_add_scrollable_text_editor(ctx,
+        x, y,
+        w - pad * 2,
+        h - pad * 2,
+        wrapped,
+        "../../notes/readme.txt");
     free(state);
     free(readme);
 }

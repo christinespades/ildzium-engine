@@ -5,29 +5,51 @@
     #define STB_IMAGE_IMPLEMENTATION
 	#include "stb_image.h"
     GLFWwindow* g_window = NULL;
+#else
+    extern WGPUDevice device;
+    extern WGPUTextureFormat swapchainFormat;
+    extern WGPUSurface surface;
 #endif
     int g_width = 1280;
     int g_height = 720;
 
 #ifdef __EMSCRIPTEN__
-    static EM_BOOL on_resize(int eventType, const EmscriptenUiEvent* e, void* userData)
+static EM_BOOL on_resize(int eventType, const EmscriptenUiEvent* e, void* userData)
 {
     double css_w, css_h;
-
-    // Get CSS (logical) size of canvas
     emscripten_get_element_css_size("#canvas", &css_w, &css_h);
-
-    // Convert to framebuffer size (account for DPI)
     double dpi = emscripten_get_device_pixel_ratio();
+    
+    int new_width  = (int)(css_w * dpi);
+    int new_height = (int)(css_h * dpi);
 
-    g_width  = (int)(css_w * dpi);
-    g_height = (int)(css_h * dpi);
+    if (new_width == g_width && new_height == g_height) 
+        return EM_TRUE;
 
-    // Resize the actual canvas backing store
+    g_width = new_width;
+    g_height = new_height;
+
+    // Update canvas backing store
     emscripten_set_canvas_element_size("#canvas", g_width, g_height);
 
-    // TODO: recreate sizedependent textures, depth buffer..
-    printf("resized\n");
+    // Only reconfigure if device + surface are ready
+    if (device && surface && gpu_state == GPU_STATE_READY) {
+        wgpuSurfaceUnconfigure(surface);   // Important!
+
+        WGPUSurfaceConfiguration config = {0};
+        config.device = device;
+        config.format = swapchainFormat;
+        config.usage = WGPUTextureUsage_RenderAttachment;
+        config.width = g_width;
+        config.height = g_height;
+        config.presentMode = WGPUPresentMode_Fifo;
+        config.alphaMode = WGPUCompositeAlphaMode_Opaque;
+        config.viewFormatCount = 0;
+        config.viewFormats = NULL;
+
+        wgpuSurfaceConfigure(surface, &config);
+        printf("Surface reconfigured to %d x %d\n", g_width, g_height);
+    }
 
     return EM_TRUE;
 }

@@ -99,7 +99,7 @@ int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y)
 
     int padding = 12;
     int text_x = b->x + padding;
-    if (b->is_editable) text_x += EDITOR_LINE_NUMBERS_WIDTH;
+    if (b->is_editable) text_x += get_param_float(PARAM_UI_EDITOR_LINE_NUMBERS_WIDTH);
 
     int text_y = b->y + padding;
     int rel_x = mouse_x - text_x;
@@ -126,8 +126,8 @@ int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y)
     int x_pos = 0;
     while (*p && *p != '\n')
     {
-        if (x_pos + FONT_WIDTH / 2 > rel_x) break;   // better threshold (half char width)
-        x_pos += FONT_WIDTH;
+        if (x_pos + get_param_float(PARAM_UI_FONT_WIDTH) / 2 > rel_x) break;   // better threshold (half char width)
+        x_pos += get_param_float(PARAM_UI_FONT_WIDTH);
         p++;
         char_index++;
     }
@@ -166,4 +166,26 @@ void select_word_at_position(UI_Button* b, int click_pos) {
     b->selection_start = start;
     b->selection_end = end;
     b->cursor_pos = end;
+}
+
+void select_all_text(UI_Button* b) {
+    if (!b->editable_content) return;
+    
+    int len = (int)strlen(b->editable_content);
+    if (len == 0) return;
+
+    b->selection_start = 0;
+    b->selection_end = len;
+    b->cursor_pos = len; // Push cursor to the end, mirroring standard text editors
+}
+
+void cut_selection_to_clipboard(UI_Button* b) {
+    if (!b->is_editable || !b->editable_content || b->selection_start == -1) return;
+
+    int start = b->selection_start < b->selection_end ? b->selection_start : b->selection_end;
+    int end   = b->selection_start > b->selection_end ? b->selection_start : b->selection_end;
+    if (start == end) return;
+
+    copy_selection_to_clipboard(b);
+    delete_char_before_cursor(b);
 }

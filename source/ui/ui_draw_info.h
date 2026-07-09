@@ -1,4 +1,5 @@
 #pragma once
+#include "core/project.h"
 #include "core/settings.h"
 #include "scene/camera.h"
 #include "ui/ui_draw.h"

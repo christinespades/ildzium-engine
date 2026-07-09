@@ -22,7 +22,7 @@ layout(set = 0, binding = 0) uniform SkyUBO {
     vec4 auroraColor;
     float vignetteStrength;
     float overallBrightness;
-    mat4 inverseView;   // ← New: from camera
+    mat4 inverseView;
 } ubo;
 
 layout(set = 0, binding = 1) uniform samplerCube starCubemap;
@@ -75,7 +75,7 @@ void main() {
         vec3 p = dir * ubo.nebulaScale * (1.8 + layer * 0.6) + offset + t * vec3(0.01, 0.008, 0.015);
 
         float n = fbm(p, 6);
-        n = pow(n * 1.1, 2.6) * 0.085;           // contrast
+        n = pow(n * 1.1, 2.6) * 0.99;           // contrast, make this first and third term param too
 
         col += nebulaColor * n * ubo.nebulaIntensity * (0.65 + 0.35 * ubo.dayNightBlend);
     }

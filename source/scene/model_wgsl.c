@@ -13,6 +13,7 @@
 	"struct CameraUBO {\n"
 	"    view : mat4x4<f32>,\n"
 	"    proj : mat4x4<f32>,\n"
+	"	 inverseView : mat4x4<f32>,\n"
 	"};\n"
 	"\n"
 	"struct VertexOutput {\n"

@@ -1,4 +1,5 @@
 #pragma once
+#include "core/platform.h"
 
 char* load_file(const char* path);
-char* save_file(const char* path, const char* data);
+void save_file(const char* path, const char* data);

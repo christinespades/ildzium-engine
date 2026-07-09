@@ -14,6 +14,14 @@ static uint32_t g_camera_flags =
     CAMERA_SHOW_YAW_PITCH;
 
 typedef enum {
+    PROJECT_NONE          = 0,
+    PROJECT_SHOW_NAME   = 1 << 0,
+} ProjectFlags;
+
+static uint32_t g_project_flags =
+    PROJECT_SHOW_NAME;
+
+typedef enum {
     RENDERER_NONE      = 0,
     RENDERER_SHOW_FPS  = 1 << 0,
     RENDERER_SHOW_DRAWN    = 1 << 1,

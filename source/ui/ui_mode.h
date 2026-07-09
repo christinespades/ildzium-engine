@@ -11,5 +11,6 @@ typedef enum {
     UI_MODE_SKYBOX,
     UI_MODE_SOUNDS,
     UI_MODE_TERRAIN,
+    UI_MODE_UI,
     UI_MODE_COUNT
 } UI_Mode;

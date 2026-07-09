@@ -78,10 +78,10 @@ void draw_project_modal(UI_Context* ctx)
     const int modal_y = (g_height - modal_h) / 2;
 
     // Background
-    ui_add_button(ctx, modal_x, modal_y, modal_w, modal_h, "", NULL, NULL, NULL);
+    ui_add_button(ctx, modal_x, modal_y, modal_w, modal_h, "", NULL, NULL, NULL, NULL, NULL);
 
     const char* title = g_is_rename_mode ? "Rename Project" : "Create New Project";
-    ui_add_button(ctx, modal_x + 20, modal_y + 20, modal_w - 40, 35, title, NULL, NULL, NULL);
+    ui_add_button(ctx, modal_x + 20, modal_y + 20, modal_w - 40, 35, title, NULL, NULL, NULL, NULL, NULL);
 
     // Text Editor
     char initial[128] = "";
@@ -93,10 +93,10 @@ void draw_project_modal(UI_Context* ctx)
 
     // OK / Cancel
     ui_add_button(ctx, modal_x + 60, modal_y + 150, 160, 45, "OK",
-                  (UI_ButtonCallback)project_modal_on_ok, NULL, NULL);
+                  (UI_ButtonCallback)project_modal_on_ok, NULL, NULL, NULL, NULL);
 
     ui_add_button(ctx, modal_x + 280, modal_y + 150, 160, 45, "Cancel",
-                  (UI_ButtonCallback)project_modal_on_cancel, NULL, NULL);
+                  (UI_ButtonCallback)project_modal_on_cancel, NULL, NULL, NULL, NULL);
 }
 
 void setup_project_controls(UI_Context* ctx)
@@ -105,7 +105,7 @@ void setup_project_controls(UI_Context* ctx)
     const int spacing = 10;
     int y = 60;
 
-    ui_add_button(ctx, 40, y, 420, 40, "PROJECT MANAGER", NULL, NULL, NULL);
+    ui_add_button(ctx, 40, y, 420, 40, "PROJECT MANAGER", NULL, NULL, NULL, NULL, NULL);
 
     int proj_count;
     Project* projects = project_get_list(&proj_count);
@@ -113,19 +113,19 @@ void setup_project_controls(UI_Context* ctx)
     for (int i = 0; i < proj_count; i++)
     {
         ui_add_button(ctx, 50, y, 340, btn_h, projects[i].name,
-                      (UI_ButtonCallback)project_on_load_clicked, NULL, NULL);
+                      (UI_ButtonCallback)project_on_load_clicked, NULL, NULL, NULL, NULL);
 
         ui_add_button(ctx, 400, y, 70, btn_h, "Rename",
-                      (UI_ButtonCallback)project_on_rename_btn_clicked, NULL, NULL);
+                      (UI_ButtonCallback)project_on_rename_btn_clicked, NULL, NULL, NULL, NULL);
 
         ui_add_button(ctx, 480, y, 70, btn_h, "Delete",
-                      (UI_ButtonCallback)project_on_delete_clicked, NULL, NULL);
+                      (UI_ButtonCallback)project_on_delete_clicked, NULL, NULL, NULL, NULL);
 
         y += btn_h + spacing;
     }
 
     ui_add_button(ctx, 40, y + btn_h + spacing, 260, 50, "Create New Project",
-                  (UI_ButtonCallback)project_on_create_btn_clicked, NULL, NULL);
+                  (UI_ButtonCallback)project_on_create_btn_clicked, NULL, NULL, NULL, NULL);
 
     if (g_show_project_modal)
         draw_project_modal(ctx);

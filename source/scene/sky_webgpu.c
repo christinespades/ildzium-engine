@@ -55,7 +55,7 @@
             .binding = 0,
             .buffer = skyUBOBuffer,
             .offset = 0,
-            .size = sizeof(SkyUBO)
+            .size = sizeof(SkyUBO) // have tried 256 here too
         };
 
         WGPUBindGroupDescriptor bgDesc = {
@@ -69,10 +69,7 @@
         if (skyLayout == NULL) printf("ERROR: skyLayout is NULL\n");
 
         skyBindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
-
-        // After creating the bind group, you should release the layout handle 
-        // (the bind group keeps its own internal reference)
-        wgpuBindGroupLayoutRelease(skyLayout);
+        // wgpuBindGroupLayoutRelease(skyLayout);
     }
 
     void create_sky_pipeline_webgpu(void)
@@ -143,7 +140,6 @@
         bglDesc.entries = &bglEntry;
         WGPUBindGroupLayout skyBGL = wgpuDeviceCreateBindGroupLayout(device, &bglDesc);
 
-        // 2. CREATE PIPELINE LAYOUT
         WGPUPipelineLayoutDescriptor plDesc = {0};
         plDesc.bindGroupLayoutCount = 1;
         plDesc.bindGroupLayouts = &skyBGL;
@@ -171,7 +167,7 @@
         };
 
         WGPURenderPipelineDescriptor desc = {0};
-        desc.layout = skyLayout; // <--- ASSIGN THE LAYOUT
+        desc.layout = skyLayout;
         desc.vertex.module = shader;
         desc.vertex.entryPoint = (WGPUStringView){.data = "vs_main", .length = 7};
         desc.vertex.bufferCount = 1;
@@ -182,8 +178,12 @@
         desc.primitive.frontFace = WGPUFrontFace_CCW;           // or CW – try both
         desc.primitive.cullMode = WGPUCullMode_None;
 
-        // Depth-stencil (set to NULL or fill it if you have depth)
-        desc.depthStencil = NULL;   // or &depthStencilState
+        WGPUDepthStencilState depthStencil = {0};
+        depthStencil.format = WGPUTextureFormat_Depth24Plus;
+        depthStencil.depthWriteEnabled = false;
+        depthStencil.depthCompare = WGPUCompareFunction_Always;
+
+        desc.depthStencil = &depthStencil;
         desc.multisample.count                  = 1;
         desc.multisample.mask                   = 0xFFFFFFFF;
         desc.multisample.alphaToCoverageEnabled = false;
