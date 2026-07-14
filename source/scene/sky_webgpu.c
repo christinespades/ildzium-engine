@@ -1,5 +1,6 @@
 #include "pch.h"
-#if defined(__EMSCRIPTEN__)
+
+#ifdef __EMSCRIPTEN
     #include "scene/sky_webgpu.h"
 
     extern WGPUDevice device;
@@ -127,7 +128,7 @@
         if (!shader) {
             printf("ERROR: Failed to create sky shader module!\n");
             return;
-}
+        }
 
        // 1. CREATE BIND GROUP LAYOUT (Required for UBO)
         WGPUBindGroupLayoutEntry bglEntry = {0};
@@ -212,5 +213,4 @@
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, skyVertexBuffer, 0, sizeof(float)*6);  // 3 verts * 2 floats
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);   // 3 vertices, not 4
     }
-
 #endif

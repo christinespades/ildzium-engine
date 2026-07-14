@@ -14,7 +14,7 @@ if not exist "%GLSLC%" (
     exit /b 1
 )
 
-for %%F in ("%SHADER_DIR%\*.vert" "%SHADER_DIR%\*.frag") do (
+for %%F in ("%SHADER_DIR%\*.vert" "%SHADER_DIR%\*.frag" "%SHADER_DIR%\*.comp") do (
     set "INPUT=%%~fF"
     set "OUTPUT=%SHADER_DIR%\%%~nxF.spv"
 

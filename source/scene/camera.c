@@ -3,70 +3,65 @@
 #include "rendering/device.h"
 #ifdef __EMSCRIPTEN__
     #include "rendering/renderer_webgpu.h"
-
-WGPUBuffer cameraBuffer = NULL;
+    WGPUBuffer cameraBuffer = NULL;
 #else
-    #include "rendering/renderer_vulkan.h"
+    #include "rendering/renderer_vk.h"
 #endif
 
-Camera camera = {0.0f, 0.0f, 5.0f, -90.0f, 0.0f, 15.0f};
+Camera camera = {0};
 CameraUBO cameraUBOData = {0};
 
 #define PI 3.14159265359f
 
 void init_camera(void)
 {
-    camera.x = 0.0f;
-    camera.y = 0.0f;
-    camera.z = 5.0f;
-    camera.yaw = -90.0f;
-    camera.pitch = 0.0f;
-    camera.speed = 15.0f;
+    vec3 pos = get_param_vec3(PARAM_CAMERA_LOCATION_DEFAULT);
+    camera.x = pos.x;
+    camera.y = pos.y;
+    camera.z = pos.z;
+    camera.yaw = get_param_float(PARAM_CAMERA_YAW_DEFAULT);
+    camera.pitch = get_param_float(PARAM_CAMERA_PITCH_DEFAULT);
+    camera.speed = get_param_float(PARAM_CAMERA_SPEED_DEFAULT);
 }
 
 // Simple look-at style view matrix from camera position + yaw/pitch
 void camera_get_view_matrix(float* out_view)
 {
-    float yawRad   = camera.yaw   * (PI / 180.0f);
-    float pitchRad = camera.pitch * (PI / 180.0f);
+    out_view[0]  = camera.right.x;
+    out_view[1]  = camera.up.x;
+    out_view[2]  = -camera.forward.x;
+    out_view[3]  = 0.0f;
 
-    float cosPitch = cosf(pitchRad);
-    float sinPitch = sinf(pitchRad);
-    float cosYaw   = cosf(yawRad);
-    float sinYaw   = sinf(yawRad);
+    out_view[4]  = camera.right.y;
+    out_view[5]  = camera.up.y;
+    out_view[6]  = -camera.forward.y;
+    out_view[7]  = 0.0f;
 
-    // Forward vector
-    float fx = cosPitch * sinYaw;
-    float fy = sinPitch;
-    float fz = cosPitch * cosYaw;
+    out_view[8]  = camera.right.z;
+    out_view[9]  = camera.up.z;
+    out_view[10] = -camera.forward.z;
+    out_view[11] = 0.0f;
 
-    // Right vector (strafe)
-    float rx = cosYaw;
-    float ry = 0.0f;
-    float rz = -sinYaw;
+    out_view[12] = -(camera.right.x * camera.x +
+                     camera.right.y * camera.y +
+                     camera.right.z * camera.z);
 
-    // Up vector
-    float ux = -sinPitch * sinYaw;
-    float uy = cosPitch;
-    float uz = -sinPitch * cosYaw;
+    out_view[13] = -(camera.up.x * camera.x +
+                     camera.up.y * camera.y +
+                     camera.up.z * camera.z);
 
-    // Build view matrix (inverse of camera transform)
-    out_view[0]  = rx;   out_view[1]  = ux;   out_view[2]  = -fx;  out_view[3]  = 0.0f;
-    out_view[4]  = ry;   out_view[5]  = uy;   out_view[6]  = -fy;  out_view[7]  = 0.0f;
-    out_view[8]  = rz;   out_view[9]  = uz;   out_view[10] = -fz;  out_view[11] = 0.0f;
+    out_view[14] = -(-camera.forward.x * camera.x -
+                     camera.forward.y * camera.y -
+                     camera.forward.z * camera.z);
 
-    // Translation part
-    out_view[12] = -(rx * camera.x + ry * camera.y + rz * camera.z);
-    out_view[13] = -(ux * camera.x + uy * camera.y + uz * camera.z);
-    out_view[14] = -(-fx * camera.x - fy * camera.y - fz * camera.z);
     out_view[15] = 1.0f;
 }
 
 void camera_get_projection_matrix(float* out_proj, float aspect_ratio)
 {
-    float fov = 60.0f * (PI / 180.0f);   // 60 degrees
-    float nearPlane = 0.1f;
-    float farPlane  = 1000.0f;
+    float fov = get_param_float(PARAM_CAMERA_FOV) * (PI / 180.0f);   // 60 degrees
+    float nearPlane = get_param_float(PARAM_CAMERA_NEAR_PLANE);
+    float farPlane  = get_param_float(PARAM_CAMERA_FAR_PLANE);
 
     float f = 1.0f / tanf(fov / 2.0f);
 
@@ -80,40 +75,32 @@ void camera_get_projection_matrix(float* out_proj, float aspect_ratio)
     out_proj[15] = 0.0f;
 }
 
-void update_camera(float deltaTime)
+void update_camera()
 {
     if (g_ui_ctx->cursor_captured) return;
 
-    float velocity = camera.speed * deltaTime;
-    float yawRad = camera.yaw * (PI / 180.0f);
+    float yawRad   = DEG2RAD(camera.yaw);
+    float pitchRad = DEG2RAD(camera.pitch);
 
-    if (platform_get_key_down(KEY_W)) {
-        camera.x += sinf(yawRad) * velocity;
-        camera.z += cosf(yawRad) * velocity;
-    }
-    if (platform_get_key_down(KEY_S)) {
-        camera.x -= sinf(yawRad) * velocity;
-        camera.z -= cosf(yawRad) * velocity;
-    }
+    float cosPitch = cosf(pitchRad);
+    float sinPitch = sinf(pitchRad);
+    float cosYaw   = cosf(yawRad);
+    float sinYaw   = sinf(yawRad);
 
-    float strafeYaw = yawRad - (PI / 2.0f);
+    camera.forward = (vec3){
+        cosPitch * sinYaw,
+        sinPitch,
+        cosPitch * cosYaw
+    };
 
-    if (platform_get_key_down(KEY_A)) {
-        camera.x += sinf(strafeYaw) * velocity;
-        camera.z += cosf(strafeYaw) * velocity;
-    }
-    if (platform_get_key_down(KEY_D)) {
-        camera.x -= sinf(strafeYaw) * velocity;
-        camera.z -= cosf(strafeYaw) * velocity;
-    }
+    camera.right = (vec3){
+        cosYaw,
+        0.0f,
+        -sinYaw
+    };
 
-    // Vertical movement
-    if (platform_get_key_down(KEY_SPACE)) {
-        camera.y += velocity;
-    }
-    if (platform_get_key_down(KEY_LEFT_SHIFT)) {
-        camera.y -= velocity;
-    }
+    camera.up = vec3_cross(camera.forward, camera.right);
+    camera.velocity = camera.speed * g_dt;
 }
 
 void update_camera_ubo(void)
@@ -159,7 +146,8 @@ void update_camera_ubo(void)
     memcpy(cameraUBOData.view, view, 16 * sizeof(float));
     memcpy(cameraUBOData.proj, proj, 16 * sizeof(float));
     memcpy(cameraUBOData.inverseView, invView, 16 * sizeof(float));
-
+    cameraUBOData.viewport[0] = g_width;
+    cameraUBOData.viewport[1] = g_height;
     void* data;
     vkMapMemory(vk_device, cameraUBOMemory, 0, sizeof(CameraUBO), 0, &data);
     memcpy(data, &cameraUBOData, sizeof(CameraUBO));

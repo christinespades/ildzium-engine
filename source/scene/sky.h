@@ -1,36 +1,12 @@
 #pragma once
 #include "scene/camera.h"
-#include "rendering/shaders.h"   // assumes load_spirv is here
 #include "ui/ui.h"
+#include "core/params/params.h"
 
-typedef struct {
-    float timeOfDay;        // 0.0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1.0 = midnight
-    float cycleSpeed;       // multiplier for automatic progression (set to 0 to disable auto cycle)
-
-    float nebulaSpeed;           // overall nebula animation speed multiplier
-    float nebulaScale;           // base scale of noise layers
-    float nebulaIntensity;       // global nebula brightness
-    float nebulaLayerCount;      // how many layers (int cast in shader, but float here for ease)
-
-    float nebulaColor1[3];       // vec3
-    float nebulaColor2[3];
-
-    float starCount;             // approx number of stars (shader loops to this)
-    float starBrightness;        // base brightness
-    float starTwinkleSpeed;      // how fast stars twinkle
-    float starSize;              // how "big" the star points are (smoothstep radius)
-
-    float auroraIntensity;
-    float auroraSpeed;
-    float auroraColor[3];
-
-    float dayNightBlend;    // 0 = full night, 1 = full day (computed from timeOfDay, but overridable)
-
-    float vignetteStrength;
-    float overallBrightness;
-} SkyParameters;
-
-extern SkyParameters g_skyParams;
+#ifndef __EMSCRIPTEN__
+    extern VkDevice vk_device;
+    extern VkDeviceMemory skyUBOMemory;
+#endif
 
 typedef struct {
     float time;
@@ -56,17 +32,8 @@ typedef struct {
     float overallBrightness;
     float pad1, pad2;          // Pad the end to 16-byte multiple
     float inverseView[16];
+    float verticalBandFrequency;
 } SkyUBO;
     extern SkyUBO skyUBOData;
 
-#ifndef __EMSCRIPTEN__
-    extern VkPipeline skyPipeline;
-    extern VkPipelineLayout skyPipelineLayout;
-    extern VkShaderModule vertShaderModule;
-    extern VkShaderModule fragShaderModule;
-
-    void sky_init(void);
-    void sky_cleanup(void);
-    void sky_draw(VkCommandBuffer cmd);
-#endif
     void sky_update(void);

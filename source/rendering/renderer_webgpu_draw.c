@@ -1,5 +1,5 @@
 #include "pch.h"
-#if defined(__EMSCRIPTEN__)
+#ifdef __EMSCRIPTEN__
     #include "rendering/renderer_webgpu_draw.h"
     extern CameraUBO cameraUBOData;
     extern WGPUBuffer cameraBuffer;
@@ -51,7 +51,7 @@
         printf("Depth texture recreated: %d x %d\n", g_width, g_height);
     }
     
-    void webgpu_draw(float dt)
+    void webgpu_draw()
     {
         if (gpu_state != GPU_STATE_READY) return;
 

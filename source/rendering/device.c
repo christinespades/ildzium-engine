@@ -8,14 +8,41 @@
     VkDevice vk_device = VK_NULL_HANDLE;
     VkQueue graphicsQueue = VK_NULL_HANDLE;
     uint32_t queueFamilyIndex = 0;
+    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Select a physical device and queue family that supports graphics and presentation
+    VkSampleCountFlagBits get_max_msaa_samples()
+    {
+        VkPhysicalDeviceProperties properties;
+
+        vkGetPhysicalDeviceProperties(
+            physicalDevice,
+            &properties
+        );
+
+
+        VkSampleCountFlags counts =
+            properties.limits.framebufferColorSampleCounts &
+            properties.limits.framebufferDepthSampleCounts;
+
+
+        if (counts & VK_SAMPLE_COUNT_8_BIT)
+            return VK_SAMPLE_COUNT_8_BIT;
+
+        if (counts & VK_SAMPLE_COUNT_4_BIT)
+            return VK_SAMPLE_COUNT_4_BIT;
+
+        if (counts & VK_SAMPLE_COUNT_2_BIT)
+            return VK_SAMPLE_COUNT_2_BIT;
+
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+
     void pick_physical_device(VkInstance instance, VkSurfaceKHR surface)
     {
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
         if (deviceCount == 0) {
-            printf("No GPU with Vulkan support found\n");
+            LOGE("No GPU with Vulkan support found");
             exit(1);
         }
 
@@ -38,6 +65,30 @@
             }
         }
         free(props);
+    }
+
+    void setup_msaa()
+    {
+        msaaSamples = get_max_msaa_samples();
+
+        switch(msaaSamples)
+        {
+            case VK_SAMPLE_COUNT_8_BIT:
+                //LOGI("MSAA: 8x");
+                break;
+
+            case VK_SAMPLE_COUNT_4_BIT:
+                //LOGI("MSAA: 4x");
+                break;
+
+            case VK_SAMPLE_COUNT_2_BIT:
+                //LOGI("MSAA: 2x");
+                break;
+
+            default:
+                //LOGI("MSAA: disabled");
+                break;
+        }
     }
 
     // Create logical device with timeline semaphore feature enabled safely
@@ -70,7 +121,7 @@
         deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
 
         if (vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &vk_device) != VK_SUCCESS) {
-            printf("Failed to create logical device\n");
+            LOGE("Failed to create logical device");
             exit(1);
         }
 

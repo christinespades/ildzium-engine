@@ -1,0 +1,174 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+const float PI  = 3.14159265359;
+const float PI2 = 6.28318530718;
+
+#define DEBUG_LINE      0
+#define DEBUG_BOX       1
+#define DEBUG_SPHERE    2
+#define DEBUG_GRID      3
+#define DEBUG_CAPSULE   4
+#define DEBUG_CYLINDER  5
+#define DEBUG_CONE      6
+#define DEBUG_GIZMO     7
+#define DEBUG_ARROW     8
+
+struct DebugLineInstance
+{
+    vec4 start;
+    vec4 end;
+    vec4 color;
+    vec4 padding;
+};
+
+struct Primitive
+{
+    uint type;
+    uint pad0;
+    uint pad1;
+    uint pad2;
+    vec4 p0_radius;
+    vec4 p1_width;
+    vec4 direction_axisLength;
+    vec4 color;
+    uint segments;
+    uint lineStart;
+    uint lineCount;
+    uint flags;
+};
+
+layout(set = 0, binding = 0)
+readonly buffer PrimitiveBuffer
+{
+    Primitive commands[];
+};
+
+layout(set = 0, binding = 1)
+writeonly buffer LineBuffer
+{
+    DebugLineInstance lines[];
+};
+
+layout(set=0,binding=2)
+uniform CameraUBO
+{
+    mat4 view;
+    mat4 proj;
+    mat4 inverseView;
+    vec2 viewport;
+} camera;
+
+layout(push_constant)
+uniform PushConstants
+{
+    uint primitiveCount;
+} push;
+
+vec2 snap_grid(
+    vec2 p,
+    float spacing)
+{
+    return floor(p/spacing)*spacing;
+}
+
+vec3 cameraPos()
+{
+    return camera.inverseView[3].xyz;
+}
+
+float grid_alpha(
+    vec3 a,
+    vec3 b)
+{
+    vec3 c=cameraPos();
+
+    float d=min(
+        distance(c,a),
+        distance(c,b));
+
+    return clamp(
+        1.0-d/400.0,
+        0.0,
+        1.0);
+}
+
+float grid_spacing(float distance)
+{
+    float p=
+        floor(log2(max(distance,1.0)));
+
+    return pow(2.0,p);
+}
+
+vec3 orthogonal(vec3 n)
+{
+    if(abs(n.x) > 0.99)
+        return normalize(cross(n, vec3(0,1,0)));
+
+    return normalize(cross(n, vec3(1,0,0)));
+}
+
+void build_basis(
+    vec3 n,
+    out vec3 x,
+    out vec3 y)
+{
+    x = orthogonal(normalize(n));
+    y = normalize(cross(normalize(n), x));
+}
+
+void write_line(
+    uint index,
+    vec3 start,
+    vec3 end,
+    float width,
+    vec3 color)
+{
+    lines[index].start = vec4(start, width);
+    lines[index].end   = vec4(end, 0.0);
+    lines[index].color = vec4(color, 1.0);
+}
+
+#extension GL_GOOGLE_include_directive : require
+#include "debug_geometry_emit.glsl"
+#include "debug_geometry_process.glsl"
+
+void main() {
+    uint primitive = gl_WorkGroupID.x;
+    if(primitive >= push.primitiveCount)
+        return;
+    Primitive p = commands[primitive];
+
+    switch(p.type)
+    {
+        case DEBUG_LINE:
+            process_line(p);
+            break;
+        case DEBUG_BOX:
+            process_box(p);
+            break;
+        case DEBUG_SPHERE:
+            process_sphere(p);
+            break;
+        case DEBUG_GRID:
+            process_grid(p);
+            break;
+        case DEBUG_CAPSULE:
+            process_capsule(p);
+            break;
+        case DEBUG_CYLINDER:
+            process_cylinder(p);
+            break;
+        case DEBUG_CONE:
+            process_cone(p);
+            break;
+        case DEBUG_GIZMO:
+            process_gizmo(p);
+            break;
+        case DEBUG_ARROW:
+            process_arrow(p);
+            break;
+    }
+}

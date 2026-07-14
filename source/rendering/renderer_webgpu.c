@@ -1,5 +1,5 @@
-#if defined(__EMSCRIPTEN__)
-    #include "pch.h"
+#include "pch.h"
+#ifdef __EMSCRIPTEN__
     #include "renderer_webgpu.h"
 
     extern CameraUBO cameraUBOData;

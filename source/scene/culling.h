@@ -1,6 +1,6 @@
 #pragma once
 #include "scene/camera.h"
-#include "core/window.h"
+#include "core/params/params.h"
 
 typedef struct { float normal[3]; float distance; } Plane;
 
@@ -57,9 +57,9 @@ inline void extract_frustum_geometric(Plane planes[6]) {
     float right[3] = { cosYaw, 0.0f, -sinYaw };
     float up[3]    = { -sinPitch * sinYaw, cosPitch, -sinPitch * cosYaw };
 
-    float fov = 60.0f * DEG_TO_RAD;
-    float nearPlane = 0.1f;
-    float farPlane  = 1000.0f;
+    float fov = get_param_float(PARAM_CAMERA_FOV) * DEG_TO_RAD;
+    float nearPlane = get_param_float(PARAM_CAMERA_NEAR_PLANE);
+    float farPlane  = get_param_float(PARAM_CAMERA_FAR_PLANE);
 
     float aspect = (float)g_width / (float)g_height;
 
@@ -151,43 +151,50 @@ inline void transform_point(const float mat[16], const float vec[3], float out_v
     out_vec[3] = mat[3]*vec[0] + mat[7]*vec[1] + mat[11]*vec[2] + mat[15];
 }
 
+// Helper function to safely transform a point by a column-major matrix
+inline void transform_point_v2(const float mat[16], const float vec[3], float out_vec[4]) {
+    out_vec[0] = mat[0]*vec[0] + mat[4]*vec[1] + mat[8]*vec[2] + mat[12];
+    out_vec[1] = mat[1]*vec[0] + mat[5]*vec[1] + mat[9]*vec[2] + mat[13];
+    out_vec[2] = mat[2]*vec[0] + mat[6]*vec[1] + mat[10]*vec[2] + mat[14];
+    out_vec[3] = mat[3]*vec[0] + mat[7]*vec[1] + mat[11]*vec[2] + mat[15];
+}
+
 inline bool is_visible_clip_space(const float center[3], float radius) {
     float view[16], proj[16];
     camera_get_view_matrix(view);
- 
+    
     float aspect = (float)g_width / (float)g_height;
     camera_get_projection_matrix(proj, aspect);
 
-    // 1. Transform center to View Space
+    // 1. Transform World Space -> View Space
     float view_pos[4];
-    transform_point(view, center, view_pos);
+    transform_point_v2(view, center, view_pos);
 
-    // 2. Transform View Space to Clip Space
+    // 2. Transform View Space -> Clip Space (gl_Position equivalent)
     float clip_pos[4];
-    transform_point(proj, view_pos, clip_pos);
+    // We treat view_pos as a vec3 for the next matrix transformation step
+    transform_point_v2(proj, view_pos, clip_pos);
 
-    // If w is zero or negative, it's behind the camera point
     float w = clip_pos[3];
+
+    // Guard against objects exactly on or behind the camera plane to prevent division by zero anomalies
     if (w <= 0.0f) {
-        // Check if the object is large enough to bleed forward past the near plane
-        if (view_pos[2] + radius < 0.1f) return false;
-        w = 0.1f; // Clamp to prevent division by zero or flip
+        // If the object's boundary can potentially cross into the positive visibility zone, keep it
+        if (view_pos[2] + radius > 0.1f) {
+            return true; 
+        }
+        return false;
     }
 
-    // 3. Convert to Normalized Device Coordinates (NDC) space [-1, 1]
-    float ndc_x = clip_pos[0] / w;
-    float ndc_y = clip_pos[1] / w;
-    float ndc_z = clip_pos[2] / w;
-
-    // Expand bounding limit slightly by the radius relative to depth projection
-    float slop = radius / w;
-
-    // Check boundaries against Vulkan/WebGPU standard clip-space volumes
-    if (ndc_x < -1.0f - slop || ndc_x > 1.0f + slop) return false;
-    if (ndc_y < -1.0f - slop || ndc_y > 1.0f + slop) return false;
+    // 3. Test against Vulkan standard clip space frustum boundaries expanded by the radius
+    // In Clip Space, an object is visible if:
+    // -w <= x <= w
+    // -w <= y <= w
+    //  0 <= z <= w  (Vulkan depth standard)
     
-    // Vulkan/WebGPU depth range is [0, 1]
-    if (ndc_z < 0.0f - slop || ndc_z > 1.0f + slop) return false;
-	
-	return true;
+    if (clip_pos[0] < -w - radius || clip_pos[0] > w + radius) return false; // Left/Right frustum exit
+    if (clip_pos[1] < -w - radius || clip_pos[1] > w + radius) return false; // Top/Bottom frustum exit
+    if (clip_pos[2] < 0.0f - radius || clip_pos[2] > w + radius) return false;  // Near/Far frustum exit
+
+    return true;
 }

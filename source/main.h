@@ -1,11 +1,6 @@
 #pragma once
-#include "core/debug.h"
-#include "core/exceptions.h"
-#include "core/time.h"
-#include "core/watcher.h"
-#include "core/window.h"
-#include "input/input.h"
-#include "rendering/surface.h"
-#include "scene/camera.h"
-#include "scene/model.h"
-#include "ui/ui.h"
+#ifdef __EMSCRIPTEN__
+	#include "core/engine/engine_webgpu.h"
+#else
+	#include "core/engine/engine_vk.h"
+#endif

@@ -1,6 +1,7 @@
 #pragma once
-#include "ui/ui_button.h"
-#include "ui/ui_mode.h"
+
+typedef struct UI_Button UI_Button;
+typedef enum UI_Mode UI_Mode;
 
 typedef struct UI_Context {
     UI_Button* buttons;
@@ -8,7 +9,8 @@ typedef struct UI_Context {
     int cursor_captured;
     uint8_t* button_held_last_frame;
     UI_Mode current_mode;
-
+    int active_button_index;
+    int mouse_pressed_last_frame;
     // Persistent Tooltip Tracking State ===
     const char* active_tooltip_text;
     int   hovered_button_x, hovered_button_y;

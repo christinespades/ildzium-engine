@@ -1,4 +1,3 @@
-#ifndef __EMSCRIPTEN__
 #pragma once
 
 // Max number of directories we can watch simultaneously
@@ -37,6 +36,4 @@ bool watcher_add_directory(const char* dir_path, const char* extensions[], int n
 // Process pending file change events (non-blocking)
 // Call this every frame or in a background thread
 void watcher_update(void);
-
 void watcher_cleanup(void);
-#endif

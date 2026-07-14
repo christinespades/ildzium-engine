@@ -25,12 +25,12 @@ char* load_file(const char* path)
 void save_file(const char *path, const char *data)
 {
     if (!path || path[0] == '\0') {
-        fprintf(stderr, "Error: Invalid file path.\n");
+        LOGE("Error: Invalid file path.");
         return;
     }
 
     if (!data) {
-        fprintf(stderr, "Error: File data is NULL.\n");
+        LOGE("Error: File data is NULL.");
         return;
     }
 
@@ -53,7 +53,7 @@ void save_file(const char *path, const char *data)
             // If the directory path isn't empty, create it
             if (strlen(path_copy) > 0) {
                 if (!platform_create_directory(path_copy)) {
-                    fprintf(stderr, "Warning: Could not verify/create directory '%s'\n", path_copy);
+                    LOGE("Warning: Could not verify/create directory '%s'", path_copy);
                     // We don't return here because the directory might already exist 
                     // via a complex edge-case, let fopen be the ultimate judge.
                 }
@@ -65,7 +65,7 @@ void save_file(const char *path, const char *data)
     // --- 2. Proceed with File Writing ---
     FILE *f = fopen(path, "wb");
     if (!f) {
-        fprintf(stderr, "Failed to open '%s': ", path);
+        LOGE("Failed to open '%s': ", path);
         perror(NULL);
         return;
     }
@@ -74,18 +74,16 @@ void save_file(const char *path, const char *data)
     size_t written = fwrite(data, 1, len, f);
 
     if (written != len) {
-        fprintf(stderr,
-                "Failed to write file '%s' (%zu of %zu bytes written).\n",
-                path, written, len);
+        LOGE("Failed to write file '%s' (%zu of %zu bytes written).", path, written, len);
         fclose(f);
         return;
     }
 
     if (fclose(f) != 0) {
-        fprintf(stderr, "Failed to close '%s': ", path);
+        LOGE("Failed to close '%s': ", path);
         perror(NULL);
         return;
     }
 
-    printf("Saved %zu bytes to '%s'\n", len, path);
+    LOGI("Saved %zu bytes to '%s'", len, path);
 }

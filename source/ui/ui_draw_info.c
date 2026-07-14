@@ -37,16 +37,13 @@ void draw_text_hscroll(uint32_t* fb, int fb_width, int fb_height,
 
     int offset = scroll_offset_x % total_width;
     if (offset < 0) offset += total_width;
-
     int start_x = x - offset - total_width;
-
     for (int base_x = start_x; base_x < x + clip_width; base_x += total_width)
     {
         // draw main text
         for (int i = 0; i < text_len; i++)
         {
             int char_x = base_x + i * char_w;
-
             if (char_x + char_w > x && char_x < x + clip_width)
             {
                 draw_char(fb, fb_width, fb_height, text[i], char_x, y, color, scale);
@@ -58,7 +55,6 @@ void draw_text_hscroll(uint32_t* fb, int fb_width, int fb_height,
         for (int i = 0; i < sep_len; i++)
         {
             int char_x = sep_start_x + i * char_w;
-
             if (char_x + char_w > x && char_x < x + clip_width)
             {
                 draw_char(fb, fb_width, fb_height, sep[i], char_x, y, color, scale);
@@ -69,14 +65,11 @@ void draw_text_hscroll(uint32_t* fb, int fb_width, int fb_height,
 
 void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
 {
-    // === Build info string dynamically ===
     char info_text[512] = {0};
     char* ptr = info_text;
     int remaining = sizeof(info_text) - 1;
-
     bool first = true;
 
-    // Helper macro to make it clean and safe
     #define APPEND(fmt, ...) \
         do { \
             if (!first) { \
@@ -95,16 +88,16 @@ void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
         APPEND("FPS: %.1f", g_fps);
 
     if (g_renderer_flags & RENDERER_SHOW_DRAWN)
-        APPEND("Drawn: %u", g_drawn_count);
+        APPEND("Meshes visible/drawn: %u", g_drawn_count);
 
     if (g_renderer_flags & RENDERER_SHOW_CULLED)
-        APPEND("Culled: %u", g_culled_count);
+        APPEND("Meshes culled: %u (%u by frustum, %u by distance)", g_culled_count, g_stats_frustum_culled, g_stats_distance_culled);
 
     if (g_camera_flags & CAMERA_SHOW_POS)
         APPEND("Pos: %.1f, %.1f, %.1f", camera.x, camera.y, camera.z);
 
     if (g_camera_flags & CAMERA_SHOW_SPEED)
-        APPEND("Speed: %.2f", camera.speed);
+        APPEND("Movement speed: %.2f", camera.speed);
     if (g_camera_flags & CAMERA_SHOW_YAW_PITCH)
         APPEND("Yaw: %.1f  Pitch: %.1f", camera.yaw, camera.pitch);
 
@@ -119,7 +112,7 @@ void ui_draw_info(uint32_t* fb, int fb_width, int fb_height, float dt)
     const int panel_y = fb_height - panel_height;
     const int padding = 20;
 
-    ui_draw_panel(fb, fb_width, fb_height,
+    draw_panel(fb, fb_width, fb_height,
                   0, panel_y, fb_width, panel_height,
                   get_param_color(PARAM_UI_COLOR_BOTTOM_INFO_PANEL_BG), get_param_color(PARAM_UI_COLOR_BOTTOM_INFO_PANEL_BORDER));
 

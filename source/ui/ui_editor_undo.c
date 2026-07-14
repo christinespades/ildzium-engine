@@ -67,9 +67,10 @@ void restore_state(UI_Button* b, EditorState* s) {
 }
 
 void init_editor_undo(UI_Button* b, int max_steps) {
+    //LOGI("Initialized editor undo");
     b->max_undo_steps = max_steps > 0 ? max_steps : 200;
-    b->undo_stack = (EditorState*)malloc(b->max_undo_steps * sizeof(EditorState));
-    b->redo_stack = (EditorState*)malloc(b->max_undo_steps * sizeof(EditorState));
+    b->undo_stack = (EditorState*)LOG_MALLOC(b->max_undo_steps * sizeof(EditorState));
+    b->redo_stack = (EditorState*)LOG_MALLOC(b->max_undo_steps * sizeof(EditorState));
     b->undo_count = b->redo_count = 0;
     b->undo_capacity = b->redo_capacity = b->max_undo_steps;
 
@@ -78,37 +79,95 @@ void init_editor_undo(UI_Button* b, int max_steps) {
 }
 
 void perform_undo(UI_Button* b) {
-    if (b->undo_count <= 1) return;   // at least keep the initial state
-
-    // push current state to redo
-    if (b->redo_count >= b->redo_capacity) {
-        free_editor_state(&b->redo_stack[0]);
-        memmove(b->redo_stack, b->redo_stack + 1,
-                (b->redo_count - 1) * sizeof(EditorState));
-        b->redo_count--;
+    // Check if the button itself is valid
+    if (b == NULL) {
+        LOGE("perform_undo failed: UI_Button is NULL");
+        return;
     }
-    copy_editor_state(&b->redo_stack[b->redo_count], b);
-    b->redo_count++;
 
-    // restore previous state
+    // Ensure we have enough history to safely undo (and undo stack exists)
+    if (b->undo_stack == NULL || b->undo_count <= 1) {
+        return; // Keeps the initial state at index 0
+    }
+
+    // If the redo stack isn't initialized, we can still undo,
+    // we just can't push to the redo stack.
+    bool can_redo = (b->redo_stack != NULL && b->redo_capacity > 0);
+
+    if (can_redo) {
+        // --- Safe Push Current State to Redo ---
+        if (b->redo_count >= b->redo_capacity) {
+            if (b->redo_count > 0) {
+                free_editor_state(&b->redo_stack[0]);
+                
+                // Only shift if there is actually more than 1 item in the stack
+                if (b->redo_count > 1) {
+                    memmove(b->redo_stack, b->redo_stack + 1,
+                            (b->redo_count - 1) * sizeof(EditorState));
+                }
+                b->redo_count--;
+            }
+        }
+
+        // Final boundary check before copying
+        if (b->redo_count >= 0 && b->redo_count < b->redo_capacity) {
+            copy_editor_state(&b->redo_stack[b->redo_count], b);
+            b->redo_count++;
+        }
+    } else {
+        //LOGI("perform_undo: Redo stack uninitialized. Undoing without keeping redo history.");
+    }
+
     b->undo_count--;
-    restore_state(b, &b->undo_stack[b->undo_count - 1]);
+    
+    // Explicit array bounds safety check before accessing the stack index
+    int target_index = b->undo_count - 1;
+    if (target_index >= 0 && target_index < b->undo_capacity) {
+        restore_state(b, &b->undo_stack[target_index]);
+    } else {
+        LOGE("perform_undo error: Target index %d is out of bounds!", target_index);
+    }
 }
 
 void perform_redo(UI_Button* b) {
-    if (b->redo_count == 0) return;
-
-    // push current to undo
-    if (b->undo_count >= b->undo_capacity) {
-        free_editor_state(&b->undo_stack[0]);
-        memmove(b->undo_stack, b->undo_stack + 1,
-                (b->undo_count - 1) * sizeof(EditorState));
-        b->undo_count--;
+    if (b == NULL) {
+        LOGE("perform_redo failed: UI_Button is NULL");
+        return;
     }
-    copy_editor_state(&b->undo_stack[b->undo_count], b);
-    b->undo_count++;
 
-    // restore from redo
+    if (b->redo_count <= 0 || b->redo_stack == NULL) {
+        return; 
+    }
+
+    if (b->undo_capacity <= 0 || b->undo_stack == NULL) {
+        //LOGI("perform_redo: Undo stack uninitialized or capacity is zero. Restoring state without pushing to undo.");
+        
+        // Skip pushing to undo, but still safely restore the redo state
+        b->redo_count--;
+        restore_state(b, &b->redo_stack[b->redo_count]);
+        return;
+    }
+
+    if (b->undo_count >= b->undo_capacity) {
+        // Double check: Can we safely shift the stack? (Prevents out-of-bounds/underflows)
+        if (b->undo_count > 0) {
+            free_editor_state(&b->undo_stack[0]);
+            
+            // Only move if there is actually more than 1 item to shift
+            if (b->undo_count > 1) {
+                memmove(b->undo_stack, b->undo_stack + 1,
+                        (b->undo_count - 1) * sizeof(EditorState));
+            }
+            b->undo_count--;
+        }
+    }
+    
+    // Final boundary check before writing to memory
+    if (b->undo_count >= 0 && b->undo_count < b->undo_capacity) {
+        copy_editor_state(&b->undo_stack[b->undo_count], b);
+        b->undo_count++;
+    }
+
     b->redo_count--;
     restore_state(b, &b->redo_stack[b->redo_count]);
 }

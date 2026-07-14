@@ -1,0 +1,85 @@
+#pragma once
+
+#define V3_BLACK       (vec3){0.0f, 0.0f, 0.0f}
+#define V3_WHITE       (vec3){1.0f, 1.0f, 1.0f}
+#define V3_RED         (vec3){1.0f, 0.0f, 0.0f}
+#define V3_GREEN       (vec3){0.0f, 1.0f, 0.0f}
+#define V3_BLUE        (vec3){0.0f, 0.0f, 1.0f}
+#define V3_YELLOW      (vec3){1.0f, 1.0f, 0.0f}
+#define V3_CYAN        (vec3){0.0f, 1.0f, 1.0f}
+#define V3_MAGENTA     (vec3){1.0f, 0.0f, 1.0f}
+#define V3_ORANGE      (vec3){1.0f, 0.5f, 0.0f}
+#define V3_GREY        (vec3){0.5f, 0.5f, 0.5f}
+#define V3_DARK_GREY   (vec3){0.2f, 0.2f, 0.2f}
+#define V3_LIGHT_GREY  (vec3){0.7f, 0.7f, 0.7f}
+#define V3_PURPLE      (vec3){0.5f, 0.0f, 0.5f}
+
+#define V3_BLACK_75      (vec3){0.0f, 0.0f, 0.0f}
+#define V3_WHITE_75      (vec3){1.0f, 1.0f, 1.0f}
+#define V3_RED_75        (vec3){1.0f, 0.0f, 0.0f}
+#define V3_GREEN_75      (vec3){0.0f, 1.0f, 0.0f}
+#define V3_BLUE_75       (vec3){0.0f, 0.0f, 1.0f}
+#define V3_YELLOW_75     (vec3){1.0f, 1.0f, 0.0f}
+#define V3_CYAN_75       (vec3){0.0f, 1.0f, 1.0f}
+#define V3_MAGENTA_75    (vec3){1.0f, 0.0f, 1.0f}
+#define V3_ORANGE_75     (vec3){1.0f, 0.5f, 0.0f}
+#define V3_GREY_75       (vec3){0.5f, 0.5f, 0.5f}
+#define V3_DARK_GREY_75  (vec3){0.2f, 0.2f, 0.2f}
+#define V3_LIGHT_GREY_75 (vec3){0.7f, 0.7f, 0.7f}
+#define V3_PURPLE_75     (vec3){0.5f, 0.0f, 0.5f}
+
+#define V3_BLACK_66      (vec3){0.0f, 0.0f, 0.0f}
+#define V3_WHITE_66      (vec3){1.0f, 1.0f, 1.0f}
+#define V3_RED_66        (vec3){1.0f, 0.0f, 0.0f}
+#define V3_GREEN_66      (vec3){0.0f, 1.0f, 0.0f}
+#define V3_BLUE_66       (vec3){0.0f, 0.0f, 1.0f}
+#define V3_YELLOW_66     (vec3){1.0f, 1.0f, 0.0f}
+#define V3_CYAN_66       (vec3){0.0f, 1.0f, 1.0f}
+#define V3_MAGENTA_66    (vec3){1.0f, 0.0f, 1.0f}
+#define V3_ORANGE_66     (vec3){1.0f, 0.5f, 0.0f}
+#define V3_GREY_66       (vec3){0.5f, 0.5f, 0.5f}
+#define V3_DARK_GREY_66  (vec3){0.2f, 0.2f, 0.2f}
+#define V3_LIGHT_GREY_66 (vec3){0.7f, 0.7f, 0.7f}
+#define V3_PURPLE_66     (vec3){0.5f, 0.0f, 0.5f}
+
+#define V3_BLACK_50      (vec3){0.0f, 0.0f, 0.0f}
+#define V3_WHITE_50      (vec3){1.0f, 1.0f, 1.0f}
+#define V3_RED_50        (vec3){1.0f, 0.0f, 0.0f}
+#define V3_GREEN_50      (vec3){0.0f, 1.0f, 0.0f}
+#define V3_BLUE_50       (vec3){0.0f, 0.0f, 1.0f}
+#define V3_YELLOW_50     (vec3){1.0f, 1.0f, 0.0f}
+#define V3_CYAN_50       (vec3){0.0f, 1.0f, 1.0f}
+#define V3_MAGENTA_50    (vec3){1.0f, 0.0f, 1.0f}
+#define V3_ORANGE_50     (vec3){1.0f, 0.5f, 0.0f}
+#define V3_GREY_50       (vec3){0.5f, 0.5f, 0.5f}
+#define V3_DARK_GREY_50  (vec3){0.2f, 0.2f, 0.2f}
+#define V3_LIGHT_GREY_50 (vec3){0.7f, 0.7f, 0.7f}
+#define V3_PURPLE_50     (vec3){0.5f, 0.0f, 0.5f}
+
+#define V3_BLACK_33      (vec3){0.0f, 0.0f, 0.0f}
+#define V3_WHITE_33      (vec3){1.0f, 1.0f, 1.0f}
+#define V3_RED_33        (vec3){1.0f, 0.0f, 0.0f}
+#define V3_GREEN_33      (vec3){0.0f, 1.0f, 0.0f}
+#define V3_BLUE_33       (vec3){0.0f, 0.0f, 1.0f}
+#define V3_YELLOW_33     (vec3){1.0f, 1.0f, 0.0f}
+#define V3_CYAN_33       (vec3){0.0f, 1.0f, 1.0f}
+#define V3_MAGENTA_33    (vec3){1.0f, 0.0f, 1.0f}
+#define V3_ORANGE_33     (vec3){1.0f, 0.5f, 0.0f}
+#define V3_GREY_33       (vec3){0.5f, 0.5f, 0.5f}
+#define V3_DARK_GREY_33  (vec3){0.2f, 0.2f, 0.2f}
+#define V3_LIGHT_GREY_33 (vec3){0.7f, 0.7f, 0.7f}
+#define V3_PURPLE_33     (vec3){0.5f, 0.0f, 0.5f}
+
+#define V3_BLACK_25      (vec3){0.0f, 0.0f, 0.0f}
+#define V3_WHITE_25      (vec3){1.0f, 1.0f, 1.0f}
+#define V3_RED_25        (vec3){1.0f, 0.0f, 0.0f}
+#define V3_GREEN_25      (vec3){0.0f, 1.0f, 0.0f}
+#define V3_BLUE_25       (vec3){0.0f, 0.0f, 1.0f}
+#define V3_YELLOW_25     (vec3){1.0f, 1.0f, 0.0f}
+#define V3_CYAN_25       (vec3){0.0f, 1.0f, 1.0f}
+#define V3_MAGENTA_25    (vec3){1.0f, 0.0f, 1.0f}
+#define V3_ORANGE_25     (vec3){1.0f, 0.5f, 0.0f}
+#define V3_GREY_25       (vec3){0.5f, 0.5f, 0.5f}
+#define V3_DARK_GREY_25  (vec3){0.2f, 0.2f, 0.2f}
+#define V3_LIGHT_GREY_25 (vec3){0.7f, 0.7f, 0.7f}
+#define V3_PURPLE_25     (vec3){0.5f, 0.0f, 0.5f}

@@ -2,9 +2,10 @@
 #include "ui/ui_button.h"
 #include "ui_editor.h"
 #include "ui/ui_editor_state.h"
-#include "ui/ui_params.h"
+#include "core/params/params.h"
 
 void free_editor_state(EditorState* s);
+typedef struct UI_Button UI_Button;
 void cleanup_editor_undo(UI_Button* b); // must be called when button is destroyed
 void copy_editor_state(EditorState* dst, const UI_Button* b);
 void push_undo_state(UI_Button* b);

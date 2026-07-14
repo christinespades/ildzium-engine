@@ -18,6 +18,7 @@
     #include <errno.h>
     #include <unistd.h>
 #endif
+#include <assert.h>
 #include <ctype.h>    // isalnum
 #include <math.h>
 #include <stdbool.h>   // for bool type
@@ -27,3 +28,9 @@
 #include <string.h>   // strlen, strcpy, memset
 #include <threads.h>        // C11 threads
 #include <time.h>
+
+#include "core/math/math.h"
+#include "core/debug/debug.h"
+#include "core/enums.h"
+#include "core/color/color.h"
+#include "core/window/window.h"

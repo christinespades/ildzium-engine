@@ -93,7 +93,7 @@ int get_text_length(UI_Button* b) {
 }
 
 // ====================== MOUSE TO CURSOR ======================
-int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y)
+int get_char_index_from_mouse(UI_Button* b)
 {
     if ((!b->content && !b->editable_content) || b->line_height <= 0) return 0;
 
@@ -102,15 +102,21 @@ int get_char_index_from_mouse(UI_Button* b, int mouse_x, int mouse_y)
     if (b->is_editable) text_x += get_param_float(PARAM_UI_EDITOR_LINE_NUMBERS_WIDTH);
 
     int text_y = b->y + padding;
-    int rel_x = mouse_x - text_x;
-    int rel_y = mouse_y - text_y + (int)b->scroll_offset;
+    int rel_x = g_mouse_x - text_x;
+    int rel_y = g_mouse_y - text_y + (int)b->scroll_offset;
 
     if (rel_x < 0) rel_x = 0;
     if (rel_y < 0) rel_y = 0;
 
     int target_line = rel_y / b->line_height;
 
-    const char* p = b->is_editable ? b->editable_content : b->content;
+    const char* p;
+    // filter out editable tuners
+    if (b->target_value != NULL) {
+        return -1;
+    } else { // regular editable text box
+        p = b->is_editable ? b->editable_content : b->content;
+    }
     int char_index = 0;
     int current_line = 0;
 

@@ -1,5 +1,4 @@
 #pragma once
-#include "core/window.h"
 #include "input/input.h"
 
 #ifndef __EMSCRIPTEN__

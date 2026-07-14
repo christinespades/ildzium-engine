@@ -1,0 +1,212 @@
+#include "pch.h"
+
+#ifndef __EMSCRIPTEN__
+	#include "scene/sky_vk.h"
+    static VkBuffer skyUBOBuffer = VK_NULL_HANDLE;
+    static VkDescriptorSetLayout skyDescriptorSetLayout = VK_NULL_HANDLE;
+    static VkDescriptorPool skyDescriptorPool = VK_NULL_HANDLE;
+    static VkDescriptorSet skyDescriptorSet = VK_NULL_HANDLE;
+
+    extern void create_vulkan_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                                     VkBuffer* buffer, VkDeviceMemory* memory);
+    extern VkExtent2D swapchainExtent;
+    extern VkRenderPass renderPass;
+    extern CameraUBO cameraUBOData;
+
+    VkPipeline skyPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout skyPipelineLayout = VK_NULL_HANDLE;
+    VkShaderModule vertShaderModule = VK_NULL_HANDLE;
+    VkShaderModule fragShaderModule = VK_NULL_HANDLE;
+
+    static void create_sky_ubo(void)
+    {
+        VkDeviceSize size = sizeof(SkyUBO);
+        create_vulkan_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                             &skyUBOBuffer, &skyUBOMemory);
+    }
+
+    static void create_sky_descriptors(void)
+    {
+        VkDescriptorSetLayoutBinding bindings[2] = {0};
+
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 2;
+        layoutInfo.pBindings = bindings;
+
+        vkCreateDescriptorSetLayout(vk_device, &layoutInfo, NULL, &skyDescriptorSetLayout);
+
+        VkDescriptorPoolSize poolSize = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
+        VkDescriptorPoolCreateInfo poolInfo = {0};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = 1;
+        vkCreateDescriptorPool(vk_device, &poolInfo, NULL, &skyDescriptorPool);
+
+        VkDescriptorSetAllocateInfo allocInfo = {0};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = skyDescriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &skyDescriptorSetLayout;
+        vkAllocateDescriptorSets(vk_device, &allocInfo, &skyDescriptorSet);
+
+        // Initial write
+        VkDescriptorBufferInfo bufInfo = { skyUBOBuffer, 0, sizeof(SkyUBO) };
+        VkWriteDescriptorSet write = {0};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = skyDescriptorSet;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &bufInfo;
+        vkUpdateDescriptorSets(vk_device, 1, &write, 0, NULL);
+    }
+
+    void create_sky_pipeline(void)
+    {
+        size_t vert_size, frag_size;
+        uint32_t* vert_code = load_spirv("../../shaders/sky.vert.spv", &vert_size);
+        uint32_t* frag_code = load_spirv("../../shaders/sky.frag.spv", &frag_size);
+        if (!vert_code || !frag_code) {
+            LOGE("Failed to load sky shaders!");
+            exit(1);
+        }
+
+        VkShaderModuleCreateInfo vertCreate = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                                                .codeSize = vert_size, .pCode = vert_code };
+        vkCreateShaderModule(vk_device, &vertCreate, NULL, &vertShaderModule);
+        free(vert_code);
+
+        VkShaderModuleCreateInfo fragCreate = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                                                .codeSize = frag_size, .pCode = frag_code };
+        vkCreateShaderModule(vk_device, &fragCreate, NULL, &fragShaderModule);
+        free(frag_code);
+
+        VkPipelineShaderStageCreateInfo shaderStages[2] = {
+            { .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+              .stage = VK_SHADER_STAGE_VERTEX_BIT, .module = vertShaderModule, .pName = "main" },
+            { .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+              .stage = VK_SHADER_STAGE_FRAGMENT_BIT, .module = fragShaderModule, .pName = "main" }
+        };
+
+        VkPipelineVertexInputStateCreateInfo vertexInput = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+        };
+
+        VkPipelineViewportStateCreateInfo viewportState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+                                                            .viewportCount = 1, .scissorCount = 1 };
+
+        VkPipelineRasterizationStateCreateInfo rasterizer = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .polygonMode = VK_POLYGON_MODE_FILL, .lineWidth = 1.0f, .cullMode = VK_CULL_MODE_NONE
+        };
+
+        VkPipelineMultisampleStateCreateInfo multisampling = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .rasterizationSamples = msaaSamples
+        };
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = VK_FALSE,
+            .depthWriteEnable = VK_FALSE,
+            .depthCompareOp = VK_COMPARE_OP_ALWAYS,
+        };
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE, // Explicitly false
+        };
+
+        VkPipelineColorBlendStateCreateInfo colorBlending = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .attachmentCount = 1, .pAttachments = &colorBlendAttachment
+        };
+
+        VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dynamicState = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = 2, .pDynamicStates = dynamicStates
+        };
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &skyDescriptorSetLayout;
+
+        if (vkCreatePipelineLayout(vk_device, &pipelineLayoutInfo, NULL, &skyPipelineLayout) != VK_SUCCESS) {
+            printf("Failed to create sky pipeline layout\n");
+            exit(1);
+        }
+
+        VkGraphicsPipelineCreateInfo pipelineInfo = {
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .stageCount = 2,
+            .pStages = shaderStages,
+            .pVertexInputState = &vertexInput,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pDepthStencilState = &depthStencil,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = &dynamicState,
+            .layout = skyPipelineLayout,
+            .renderPass = renderPass,
+            .subpass = 0
+        };
+
+        if (vkCreateGraphicsPipelines(vk_device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &skyPipeline) != VK_SUCCESS) {
+            LOGE("Failed to create sky pipeline");
+            exit(1);
+        }
+
+        LOGI("Sky pipeline created successfully");
+    }
+
+    void sky_init(void)
+    {
+        create_sky_ubo();
+        create_sky_descriptors();
+        create_sky_pipeline();
+    }
+
+    void sky_cleanup(void)
+    {
+        vkDeviceWaitIdle(vk_device);
+        vkDestroyPipeline(vk_device, skyPipeline, NULL);
+        vkDestroyPipelineLayout(vk_device, skyPipelineLayout, NULL);
+        vkDestroyShaderModule(vk_device, vertShaderModule, NULL);
+        vkDestroyShaderModule(vk_device, fragShaderModule, NULL);
+        vkDestroyBuffer(vk_device, skyUBOBuffer, NULL);
+        vkFreeMemory(vk_device, skyUBOMemory, NULL);
+        vkDestroyDescriptorSetLayout(vk_device, skyDescriptorSetLayout, NULL);
+        vkDestroyDescriptorPool(vk_device, skyDescriptorPool, NULL);
+    }
+
+    void sky_draw(VkCommandBuffer cmd)
+    {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipelineLayout, 0, 1, &skyDescriptorSet, 0, NULL);
+
+        VkViewport viewport = {0, 0, (float)swapchainExtent.width, (float)swapchainExtent.height, 0.0f, 1.0f};
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+        VkRect2D scissor = {{0,0}, swapchainExtent};
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+        vkCmdDraw(cmd, 4, 1, 0, 0);
+    }
+#endif

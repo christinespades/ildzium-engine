@@ -41,7 +41,10 @@ static uint32_t g_renderer_flags =
 extern float g_fps;
 extern uint32_t g_drawn_count;
 extern uint32_t g_culled_count;
-
+extern bool g_enable_distance_culling;
+extern bool g_enable_frustum_culling;
+extern uint32_t g_stats_distance_culled;
+extern uint32_t g_stats_frustum_culled;
 // toggle_flag(&g_camera_flags, CAMERA_SHOW_POS);
 static inline void toggle_flag(uint32_t *flags, uint32_t flag)
 {

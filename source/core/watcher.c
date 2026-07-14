@@ -1,7 +1,7 @@
 #include "pch.h"
 #ifndef __EMSCRIPTEN__
     #include "watcher.h"
-    #include "rendering/shaders.h"
+    #include "rendering/shaders_vk.h"
 
     extern void on_shader_changed(const char* path);
 
@@ -26,7 +26,7 @@
             snprintf(g_glslc_path, sizeof(g_glslc_path),
                      "%s\\Bin\\glslc.exe", sdk);
         } else {
-            printf("VULKAN_SDK not set, using fallback: %s\n", g_glslc_path);
+            LOGI("VULKAN_SDK not set, using fallback: %s", g_glslc_path);
         }
     }
 
@@ -53,7 +53,7 @@
 
         PROCESS_INFORMATION pi;
         if (!CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
-            printf("[Watcher] Failed to launch glslc.exe\n");
+            LOGE("[Watcher] Failed to launch glslc.exe");
             return;
         }
 
@@ -66,7 +66,7 @@
         CloseHandle(pi.hThread);
 
         if (exit_code == 0) {
-            printf("[Watcher] Success\n");
+            LOGI("[Watcher] Success");
 
             // Enqueue shader for hot reload
             int tail = g_queue_tail;
@@ -75,10 +75,10 @@
                 strcpy(g_reload_queue[tail].shader_path, full_path);
                 InterlockedExchange(&g_queue_tail, next);
             } else {
-                printf("[Watcher] Reload queue full!\n");
+                LOGI("[Watcher] Reload queue full!");
             }
         } else {
-            printf("[Watcher] Compilation failed (code %lu)\n", exit_code);
+            LOGE("[Watcher] Compilation failed (code %lu)", exit_code);
         }
     }
 
@@ -123,7 +123,7 @@
 
     static int watcher_thread_func(void* arg)
     {
-        printf("[Watcher] Background thread started\n");
+        LOGI("Background thread started");
 
         while (g_running) {
             bool had_event = false;
@@ -144,14 +144,14 @@
             }
         }
 
-        printf("[Watcher] Background thread shutting down\n");
+        LOGI("Background thread shutting down");
         return 0;
     }
 
     bool watcher_init()
     {
         init_glslc_path();
-        const char* shader_exts[] = { ".vert", ".frag", ".comp" };  // add more if needed
+        const char* shader_exts[] = { ".vert", ".frag", ".comp" };
         watcher_add_directory("../../shaders", shader_exts, 3);
 
         g_reload_callback = on_shader_changed;
@@ -160,7 +160,7 @@
         InterlockedExchange(&g_queue_tail, 0);
 
         if (thrd_create(&g_watcher_thread, watcher_thread_func, NULL) != thrd_success) {
-            printf("Failed to create watcher thread\n");
+            LOGE("Failed to create watcher thread");
             return false;
         }
         return true;
@@ -169,7 +169,7 @@
     bool watcher_add_directory(const char* dir_path, const char* extensions[], int num_extensions)
     {
         if (g_num_watchers >= MAX_WATCHED_DIRS) {
-            printf("Too many watched directories!\n");
+            LOGE("Too many watched directories!");
             return false;
         }
 
@@ -187,7 +187,7 @@
         );
 
         if (w->hDir == INVALID_HANDLE_VALUE) {
-            printf("Failed to open directory for watching: %s\n", dir_path);
+            LOGE("Failed to open directory for watching: %s", dir_path);
             return false;
         }
 
@@ -221,9 +221,8 @@
 
         w->active = true;
         g_num_watchers++;
-        printf("Watching directory: %s for extensions:", dir_path);
-        for (int i = 0; i < num_extensions; ++i) printf(" %s", extensions[i]);
-        printf("\n");
+        LOGI("Watching directory: %s for extensions:", dir_path);
+        for (int i = 0; i < num_extensions; ++i) LOGI(" %s", extensions[i]);
 
         return true;
     }
@@ -257,9 +256,6 @@
         }
 
         thrd_join(g_watcher_thread, NULL);
-        
-        // Skip all loops over free() completely! 
-        // The operating system garbage collects the process heap instantly.
         g_num_watchers = 0;
     }
 #endif

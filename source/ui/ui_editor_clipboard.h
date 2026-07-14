@@ -1,9 +1,8 @@
 #pragma once
 #include "ui/ui_editor_string.h"
 
-#ifndef __EMSCRIPTEN__
-	#include "core/window.h"
-#else
+typedef struct UI_Button UI_Button;
+#ifdef __EMSCRIPTEN__
 	void js_get_clipboard(void (*cb)(const char*, void*), void* user);
 #endif
 	void platform_set_clipboard(const char* text);

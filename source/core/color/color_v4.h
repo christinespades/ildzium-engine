@@ -1,0 +1,86 @@
+#pragma once
+
+#define V4_BLACK        (vec4){0.0f, 0.0f, 0.0f, 1.0f}
+#define V4_WHITE        (vec4){1.0f, 1.0f, 1.0f, 1.0f}
+#define V4_RED          (vec4){1.0f, 0.0f, 0.0f, 1.0f}
+#define V4_GREEN        (vec4){0.0f, 1.0f, 0.0f, 1.0f}
+#define V4_BLUE         (vec4){0.0f, 0.0f, 1.0f, 1.0f}
+#define V4_YELLOW       (vec4){1.0f, 1.0f, 0.0f, 1.0f}
+#define V4_CYAN         (vec4){0.0f, 1.0f, 1.0f, 1.0f}
+#define V4_MAGENTA      (vec4){1.0f, 0.0f, 1.0f, 1.0f}
+#define V4_ORANGE       (vec4){1.0f, 0.5f, 0.0f, 1.0f}
+#define V4_GREY         (vec4){0.5f, 0.5f, 0.5f, 1.0f}
+#define V4_DARK_GREY    (vec4){0.2f, 0.2f, 0.2f, 1.0f}
+#define V4_LIGHT_GREY   (vec4){0.7f, 0.7f, 0.7f, 1.0f}
+#define V4_PURPLE       (vec4){0.5f, 0.0f, 0.5f, 1.0f}
+#define V4_TRANSPARENT  (vec4){0.0f, 0.0f, 0.0f, 0.0f}
+
+#define V4_BLACK_75      (vec4){0.0f, 0.0f, 0.0f, 0.75f}
+#define V4_WHITE_75      (vec4){1.0f, 1.0f, 1.0f, 0.75f}
+#define V4_RED_75        (vec4){1.0f, 0.0f, 0.0f, 0.75f}
+#define V4_GREEN_75      (vec4){0.0f, 1.0f, 0.0f, 0.75f}
+#define V4_BLUE_75       (vec4){0.0f, 0.0f, 1.0f, 0.75f}
+#define V4_YELLOW_75     (vec4){1.0f, 1.0f, 0.0f, 0.75f}
+#define V4_CYAN_75       (vec4){0.0f, 1.0f, 1.0f, 0.75f}
+#define V4_MAGENTA_75    (vec4){1.0f, 0.0f, 1.0f, 0.75f}
+#define V4_ORANGE_75     (vec4){1.0f, 0.5f, 0.0f, 0.75f}
+#define V4_GREY_75       (vec4){0.5f, 0.5f, 0.5f, 0.75f}
+#define V4_DARK_GREY_75  (vec4){0.2f, 0.2f, 0.2f, 0.75f}
+#define V4_LIGHT_GREY_75 (vec4){0.7f, 0.7f, 0.7f, 0.75f}
+#define V4_PURPLE_75     (vec4){0.5f, 0.0f, 0.5f, 0.75f}
+
+#define V4_BLACK_66      (vec4){0.0f, 0.0f, 0.0f, 0.66f}
+#define V4_WHITE_66      (vec4){1.0f, 1.0f, 1.0f, 0.66f}
+#define V4_RED_66        (vec4){1.0f, 0.0f, 0.0f, 0.66f}
+#define V4_GREEN_66      (vec4){0.0f, 1.0f, 0.0f, 0.66f}
+#define V4_BLUE_66       (vec4){0.0f, 0.0f, 1.0f, 0.66f}
+#define V4_YELLOW_66     (vec4){1.0f, 1.0f, 0.0f, 0.66f}
+#define V4_CYAN_66       (vec4){0.0f, 1.0f, 1.0f, 0.66f}
+#define V4_MAGENTA_66    (vec4){1.0f, 0.0f, 1.0f, 0.66f}
+#define V4_ORANGE_66     (vec4){1.0f, 0.5f, 0.0f, 0.66f}
+#define V4_GREY_66       (vec4){0.5f, 0.5f, 0.5f, 0.66f}
+#define V4_DARK_GREY_66  (vec4){0.2f, 0.2f, 0.2f, 0.66f}
+#define V4_LIGHT_GREY_66 (vec4){0.7f, 0.7f, 0.7f, 0.66f}
+#define V4_PURPLE_66     (vec4){0.5f, 0.0f, 0.5f, 0.66f}
+
+#define V4_BLACK_50      (vec4){0.0f, 0.0f, 0.0f, 0.50f}
+#define V4_WHITE_50      (vec4){1.0f, 1.0f, 1.0f, 0.50f}
+#define V4_RED_50        (vec4){1.0f, 0.0f, 0.0f, 0.50f}
+#define V4_GREEN_50      (vec4){0.0f, 1.0f, 0.0f, 0.50f}
+#define V4_BLUE_50       (vec4){0.0f, 0.0f, 1.0f, 0.50f}
+#define V4_YELLOW_50     (vec4){1.0f, 1.0f, 0.0f, 0.50f}
+#define V4_CYAN_50       (vec4){0.0f, 1.0f, 1.0f, 0.50f}
+#define V4_MAGENTA_50    (vec4){1.0f, 0.0f, 1.0f, 0.50f}
+#define V4_ORANGE_50     (vec4){1.0f, 0.5f, 0.0f, 0.50f}
+#define V4_GREY_50       (vec4){0.5f, 0.5f, 0.5f, 0.50f}
+#define V4_DARK_GREY_50  (vec4){0.2f, 0.2f, 0.2f, 0.50f}
+#define V4_LIGHT_GREY_50 (vec4){0.7f, 0.7f, 0.7f, 0.50f}
+#define V4_PURPLE_50     (vec4){0.5f, 0.0f, 0.5f, 0.50f}
+
+#define V4_BLACK_33      (vec4){0.0f, 0.0f, 0.0f, 0.33f}
+#define V4_WHITE_33      (vec4){1.0f, 1.0f, 1.0f, 0.33f}
+#define V4_RED_33        (vec4){1.0f, 0.0f, 0.0f, 0.33f}
+#define V4_GREEN_33      (vec4){0.0f, 1.0f, 0.0f, 0.33f}
+#define V4_BLUE_33       (vec4){0.0f, 0.0f, 1.0f, 0.33f}
+#define V4_YELLOW_33     (vec4){1.0f, 1.0f, 0.0f, 0.33f}
+#define V4_CYAN_33       (vec4){0.0f, 1.0f, 1.0f, 0.33f}
+#define V4_MAGENTA_33    (vec4){1.0f, 0.0f, 1.0f, 0.33f}
+#define V4_ORANGE_33     (vec4){1.0f, 0.5f, 0.0f, 0.33f}
+#define V4_GREY_33       (vec4){0.5f, 0.5f, 0.5f, 0.33f}
+#define V4_DARK_GREY_33  (vec4){0.2f, 0.2f, 0.2f, 0.33f}
+#define V4_LIGHT_GREY_33 (vec4){0.7f, 0.7f, 0.7f, 0.33f}
+#define V4_PURPLE_33     (vec4){0.5f, 0.0f, 0.5f, 0.33f}
+
+#define V4_BLACK_25      (vec4){0.0f, 0.0f, 0.0f, 0.25f}
+#define V4_WHITE_25      (vec4){1.0f, 1.0f, 1.0f, 0.25f}
+#define V4_RED_25        (vec4){1.0f, 0.0f, 0.0f, 0.25f}
+#define V4_GREEN_25      (vec4){0.0f, 1.0f, 0.0f, 0.25f}
+#define V4_BLUE_25       (vec4){0.0f, 0.0f, 1.0f, 0.25f}
+#define V4_YELLOW_25     (vec4){1.0f, 1.0f, 0.0f, 0.25f}
+#define V4_CYAN_25       (vec4){0.0f, 1.0f, 1.0f, 0.25f}
+#define V4_MAGENTA_25    (vec4){1.0f, 0.0f, 1.0f, 0.25f}
+#define V4_ORANGE_25     (vec4){1.0f, 0.5f, 0.0f, 0.25f}
+#define V4_GREY_25       (vec4){0.5f, 0.5f, 0.5f, 0.25f}
+#define V4_DARK_GREY_25  (vec4){0.2f, 0.2f, 0.2f, 0.25f}
+#define V4_LIGHT_GREY_25 (vec4){0.7f, 0.7f, 0.7f, 0.25f}
+#define V4_PURPLE_25     (vec4){0.5f, 0.0f, 0.5f, 0.25f}
